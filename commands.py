@@ -42,3 +42,6 @@ class Commands(object):
 
     async def testGravityMode(self, mode):
         await self._send('testGravityMode', mode)
+
+    async def testCameraViewScale(self, scale):
+        await self._send('testCameraViewScale', scale)

@@ -1,0 +1,9 @@
+User can create a module and put it in this dir and it will be read in and loaded.
+Eventually at the correct time...
+
+The format is simple... Override events occuring in log.txt file with "type":<event> then act on them
+
+TODO 
+add a list of all the possible events
+More detail, howto
+Map vs server vs mode

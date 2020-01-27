@@ -4,9 +4,6 @@ import asyncio
 import aiofiles
 import ujson
 import uuid
-import random
-import os
-
 import xml.etree.ElementTree as ET
 
 #from threading import Thread
@@ -24,7 +21,7 @@ LAUNCHER_CONFIG = '/home/sean/altitude/servers/launcher_config.xml'
 
 
 import commands
-
+from modules import *
 
 class Item(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Item')
@@ -168,6 +165,8 @@ class Map(Item):
 
         return self
 
+    
+
 class Team(object):
     pass
 
@@ -217,140 +216,6 @@ class Player(Item):
         #return self.vaporId == other.vaporId # what about bots?
 
 
-#
-# Just here to show where its going...
-#
-
-class Module(object):
-    def __init__(self, *args, **kwargs):
-        pass
-   
-class ServerModule(Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
-        
-
-class GameModeModule(ServerModule):
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
-
-class MapModule(ServerModule):
-    def __init__(self,  *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
-
-## 
-#example user made module
-##
-
-class BallFlipGravityModule(MapModule):
-    def __init__(self, map='ball_space_balls'):
-        self.map = map
-        super().__init__(self, map)
-
-    async def powerupPickup(self, event, _, servers):
-        server = servers[event['port']]
-        #
-        # HACK!!!!!!!!!!!!!!!!!!!!!!!!
-        #
-        #this is not working as a MapModule yet, so I'm just going to check
-        # here for now
-        if server.active_map.name !=  self.map: return
-        if event['powerup'] != 'Ball': return
-
-        player = await server.get_player_by_number(event['player'])
-        await server.testGravityMode(2)
-        #await server.serverMessage('Ball is held...Gravity has been disrupted!')
-
-
-    async def powerupUse(self, event, _, servers):
-        server = servers[event['port']]
-        if server.active_map.name !=  self.map: return
-        if event['powerup'] != 'Ball': return
-    
-        player = await server.get_player_by_number(event['player'])
-        await server.testGravityMode(0)
-        #await server.serverMessage('Gravity has returned to normal.')
-
-
-class ShockWaveModule(GameModeModule):
-    #
-    # Not really set to work on just TBD yet!!
-    #
-    def __init__(self, mode='TBD'):
-        self.mode = mode
-        super().__init__(self, mode)
-
-
-    async def kill(self, event, _, servers):
-        #{"victimPositionY":407.63,"victimVelocityX":1.17,"streak":3,"source":"plane","type":"kill","victimPositionX":1395.17,"victimVelocityY":2.63,"multi":3,"port":27278,"xp":10,"victim":0,"time":12800875,"player":11}
-        async def jiggle(multi, team):
-            if not team: return
-    
-            for player in team:
-                if not player.is_bot():
-                    await player.whisper('MULTI-KILL (%s) OMEGA BURST INCOMING!!!' %  multi)
-                    #await player.whisper('TAKE COVER!!!')
-                for i in range(1, multi+2):
-                    await player.applyForce(random.randrange(i*-5,i*5),random.randrange(i*-5,i*5))
-                    await asyncio.sleep(.2)
-                #await player.applyForce(random.randrange(-10,10),random.randrange(-10,10))
-                #await asyncio.sleep(.1)
-                #await player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
-        
-        server = servers[event['port']]
-        player = await server.get_player_by_number(event['player'])
-        teams = server.get_players_by_team()
-        if event['multi'] > 1:
-            if player in teams['leftTeam']:
-                await jiggle(event['multi'],teams.get('rightTeam'))
-            else:
-                await jiggle(event['multi'], teams.get('leftTeam'))
-
-
-    async def structureDamage(self, event, _, servers):
-        async def jiggle(team):
-            if not team: return
-
-            for player in team:
-                if not player.is_bot():
-                    await player.whisper('BEWARE SHOCK WAVE FROM BASE DAMAGE!')
-                await player.applyForce(random.randrange(-12,12),random.randrange(-12,12))
-                await asyncio.sleep(.2)
-                await player.applyForce(random.randrange(-10,10),random.randrange(-10,10))
-                await asyncio.sleep(.2)
-                await player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
-
-        server = servers[event['port']]
-        # for testing
-        #{"positionY":475,"port":27278,"exactXp":31.25,"xp":31,"time":5135540,"type":"structureDamage","player":3,"target":"base","positionX":3184}
-        player = await server.get_player_by_number(event['player'])
-        teams = server.get_players_by_team()
-        if event['target'] == 'base':
-            if player in teams['leftTeam']:
-                await jiggle(teams.get('rightTeam'))
-            else:
-                await jiggle(teams.get('leftTeam'))
-
-    async def structureDestroy(self, event, _, servers):
-        async def jiggle(team):
-            for player in team:
-                if not player.is_bot():
-                    await player.whisper('SHRAPNAL INCOMING FROM DESTROYED TURRET!')
-                await player.applyForce(random.randrange(-10,10),random.randrange(-10,10))
-                await asyncio.sleep(.1)
-                await player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
-
-        server = servers[event['port']]
-        player = await server.get_player_by_number(event['player'])
-        teams = server.get_players_by_team()
-        if event['target'] == 'turret':
-            if player in teams.get('leftTeam'):
-                await jiggle(teams.get('rightTeam'))
-            else:
-                await jiggle(teams.get('leftTeam'))
-
-
-
 class Events(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Events')
 
@@ -388,14 +253,7 @@ class Events(object):
         map_ = Map(server)
         map_ = await map_.parse(event)
         #might need to call a method here instead
-        if map_.name == 'ball_football':
-            await asyncio.sleep(4)
-            await server.serverMessage("Aren't we bored with this?  Lets try something a little different...")
-            await asyncio.sleep(3)
-            await server.changeMap('ball_space_balls')
-
-        if map_.name == 'ball_space_balls':
-            await server.serverMessage('Initializing warped gravity mode!!!!')
+        #map_.loadModules
 
         await server.set_active_map(map_)
 
@@ -467,8 +325,8 @@ class Worker(Events):
         # SERVER
         # 
         # Will do for all (server?) modules
-        modules = (ShockWaveModule, BallFlipGravityModule)
-        for module in modules:
+        mods = (shockwave.ShockWaveModule, )
+        for module in mods:
             for func_name in get_module_events(module()):
                 func = getattr(module(), func_name)
                 setattr(self, func_name, func)

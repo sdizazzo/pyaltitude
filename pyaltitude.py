@@ -3,7 +3,6 @@
 import asyncio
 import aiofiles
 import ujson
-import uuid
 import xml.etree.ElementTree as ET
 
 #from threading import Thread
@@ -12,208 +11,19 @@ import logging
 from aiologger import Logger
 logging.basicConfig(level=logging.DEBUG)
 
-import pprint
-pp = pprint.PrettyPrinter(indent=4)
-
+#TODO config module
+# paths are currently hardcoded in individual mods
 PATH = '/home/sean/altitude/servers/log.txt'
 COMMAND_PATH = '/home/sean/altitude/servers/command.txt'
 LAUNCHER_CONFIG = '/home/sean/altitude/servers/launcher_config.xml'
 
 
-import commands
-from modules import *
-
-class Item(object):
-    logger = Logger.with_default_handlers(name='pyaltitude.Item')
-
-    """
-        Objects subclass from this and json responses will be populated as
-        instance variables automatically after calling 
-        `await super().parse(attrs)`
-
-        No boilerplate!
-    """
-    async def parse(self, json_dict, convert_types=False):
-        for k, v in json_dict.items():
-            if convert_types:
-                v = await self.convert_value(v)
-            setattr(self, k, v)
-
-    async def convert_value(self, v):
-        if v == 'true':
-            return True
-        elif v == 'false':
-            return False
-        elif v.isalnum():
-            return int(v)
-        return v
-
-    async def describe(self):
-        return pp.pformat({k:v for k,v in self.__dict__.items() if k != '_json'})
-
-#class BotConfig(
-
-class Server(Item, commands.Commands):
-    logger = Logger.with_default_handlers(name='pyaltitude.Server')
-
-    def __init__(self):
-        # check if player is admin when logging in, then set is_admin
-        self.admin_vaporIds = list()
-        self.players = list() # <--- on active map??
-        #self.teams = set() # server.map.leftteam, rightteam
-        self.mapList = list() # can these be added to dynamically? check commands
-        self.mapRotationList = list()
-        
-
-        self.active_map = None
-
-    # NOTE
-    # Load and Unload module methods have to be on the worker threads since
-    # they executre in their own environment
-    # I'm 90% sure
-
-    async def set_active_map(self, map):
-        print('Setting active_map on server %s to %s' % (self.serverName, map.name))
-        self.active_map = map
-            
-    async def add_player(self, player, message=True):
-        print('Adding player to server %s with %s' % (self.serverName, player.vaporId))
-        self.players.append(player)
-        await self.players_changed(player, True, message=message)
-
-    async def remove_player(self, player, message=True):
-        print('Removing player from server %s with %s' % (self.serverName, player.vaporId))
-        self.players.remove(player)
-        await self.players_changed(player, False, message=message)
-
-
-    async def players_changed(self, player, added, message=True):
-        if not player.is_bot():
-            if added:
-                print("%s joined server %s" % (player.nickname, self.serverName))
-                await player.whisper('Hey %s!' % player.nickname)
-                await player.whisper('Welcome to %s!' % self.serverName)
-
-            if message:
-                await self.serverMessage('%s players now in server' % len(self.get_players())) 
-            print([p.nickname for p in self.get_players()])
-
-
-    async def map_player_positions(self, event):
-        #{"positionByPlayer":{"0":"776,726","1":"3028,683","2":"704,784","3":"3043,799","4":"652,733","5":"3095,748","6":"-1,-1"},"port":27278,"time":46699,"type":"logPlanePositions"}
-        for pid, coords in event['positionByPlayer'].items():
-            player = await self.get_player_by_number(int(pid), bots=False) 
-            x, y = coords.split(',')
-            if not player:
-                continue
-            player.x, player.y = (int(x), int(y))
-
-    #async def message(self, message):
-    #    await commands.ServerMessage(self.port, message).send()
-
-    def get_players(self, bots=False):
-        pl = list()
-        for p in self.players:
-            if not bots and p.is_bot():
-                continue
-            pl.append(p)
-        return pl
-
-    def get_players_by_team(self):
-        teams = dict(leftTeam=list(), rightTeam=list())
-        for p in self.get_players(bots=True):
-            if p.team == self.active_map.leftTeam:
-                teams['leftTeam'].append(p)
-            elif p.team == self.active_map.rightTeam:
-                teams['rightTeam'].append(p)
-        return teams
-
-    def get_player_by_vaporId(self, vaporId):
-        for p in self.get_players():
-            if p.vaporId == uuid.UUID(vaporId):
-                return p
-        #try:
-        #    return next((p for p in self.players if p.vaporId == uuid.UUID(vaporId)))
-        #except StopIteration:
-        #    #slow, but don't think this raised often.  Only on startup
-        #    return None
-
-    async def get_player_by_number(self, number, bots=True):
-        for p in self.get_players(bots=bots):
-            #print(await p.describe())
-            if p.player == number:
-                return p
-
-    async def parse(self, attrs):
-        #convert_types since we are reading from the xml file
-        await super().parse(attrs, convert_types=True)
-        commands.Commands.__init__(self)        
-        return self
-
-
-class Map(Item):
-    logger = Logger.with_default_handlers(name='pyaltitude.Map')
-
-    def __init__(self, server):
-        self.server = server
-
-    async def parse(self, json):
-        self._json = json
-        await super().parse(json)
-
-        self.name = self.map
-
-        return self
-
-    
-
-class Team(object):
-    pass
-
-
-class Player(Item):
-    logger = Logger.with_default_handlers(name='pyaltitude.Player')
-
-    def __init__(self, server):
-        self.is_admin = False
-        self.server = server
-        self.x = -1
-        self.y = -1
-        self.team = None
-        #{"powerup":"Ball","positionY":1050,"playerVelX":-4.4,"playerVelY":-3.7,"port":27278,"velocityX":0,"time":389501,"type":"powerupPickup","velocityY":0,"player":2,"positionX":2036}
-        #{"powerup":"Ball","positionY":158.65,"port":27278,"velocityX":-4.41,"time":1054454,"type":"powerupUse","velocityY":3.65,"player":4,"positionX":1191.59}
-        self.powerup = None
-
-    async def parse(self, json):
-        self._json = json
-        await super().parse(json)
-        self.vaporId = uuid.UUID(self.vaporId)
-        # UNTESTED
-        #if self.vaporId in self.server.admin_vaporIds:
-        #    self.is_admin = True
-        return self
-
-    async def parse_playerInfoEv(self, json):
-        for k, v in json.items():
-            if not k in ('port', 'type', 'player'):
-                setattr(self, k, v)
-
-    def set_team(self, team):
-        self.team = team
-
-    async def whisper(self, message):
-        await self.server.serverWhisper(self.nickname, message)
-
-    async def applyForce(self, x, y):
-        await self.server.applyForce(self.player, x, y)
-
-
-    def is_bot(self):
-        return int(self.vaporId) == 0 
-
-    def __eq__(self, other):
-        return self.nickname == other.nickname
-        #return self.vaporId == other.vaporId # what about bots?
+from pyaltitude import commands
+from pyaltitude.base import Base
+from pyaltitude.map import Map
+from pyaltitude.player import Player
+from pyaltitude.server import Server
+from pyaltitude.modules import *
 
 
 class Events(object):

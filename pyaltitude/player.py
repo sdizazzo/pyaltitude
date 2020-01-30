@@ -1,4 +1,5 @@
 import uuid
+import asyncio
 
 from . import base
 
@@ -42,6 +43,13 @@ class Player(base.Base):
     async def applyForce(self, x, y):
         await self.server.applyForce(self.player, x, y)
 
+    async def spawned(self):
+        #reset our spawn point after a call to /attach
+        
+        # sleep for a moment to let /attach work
+        # not sure if this is necessary
+        #asyncio.sleep(.2)
+        await self.server.overrideSpawnPoint(self.player, 0, 0, 0)
 
     def is_bot(self):
         return int(self.vaporId) == 0

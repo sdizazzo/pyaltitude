@@ -72,13 +72,13 @@ class Server(base.Base, commands.Commands):
     def get_players_by_team(self):
         teams = dict(leftTeam=list(), rightTeam=list())
         for p in self.get_players(bots=True):
-            if p.team == self.active_map.leftTeam:
+            if p.team == self.map.leftTeam:
                 teams['leftTeam'].append(p)
-            elif p.team == self.active_map.rightTeam:
+            elif p.team == self.map.rightTeam:
                 teams['rightTeam'].append(p)
         return teams
 
-    def get_player_by_vaporId(self, vaporId):
+    async def get_player_by_vaporId(self, vaporId):
         for p in self.get_players():
             if p.vaporId == uuid.UUID(vaporId):
                 return p
@@ -92,6 +92,11 @@ class Server(base.Base, commands.Commands):
         for p in self.get_players(bots=bots):
             #print(await p.describe())
             if p.player == number:
+                return p
+
+    async def get_player_by_name(self, name):
+        for p in self.get_players():
+            if p.nickname == name:
                 return p
 
     async def parse(self, attrs):

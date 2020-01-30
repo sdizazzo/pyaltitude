@@ -45,3 +45,9 @@ class Commands(object):
 
     async def testCameraViewScale(self, scale):
         await self._send('testCameraViewScale', scale)
+
+    async def overrideSpawnPoint(self, player, x, y, angle):
+        await self._send('overrideSpawnPoint', player, x, y, angle)
+
+    async def overrideBallScore(self, leftscore, rightscore):
+        await self._send('overrideBallScore', leftscore, rightscore)

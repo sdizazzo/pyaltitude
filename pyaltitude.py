@@ -44,9 +44,18 @@ class Events(object):
         # BUG player is None sometimes here and I dont understand why yet
         #Its a race condition.  Not sure if it matters or not yet
         # seems not to so I'll leave it as is for now and worry later
-        player = server.get_player_by_vaporId(event['vaporId'])
+        player = await server.get_player_by_vaporId(event['vaporId'])
         if player:
             await server.remove_player(player, message=not INIT)
+
+    async def spawn(self, event, _, servers):
+        server = servers[event['port']]
+        #{'plane': 'Biplane', 'port': 27280, 'perkGreen': 'Heavy Armor',
+        #'perkRed': 'Heavy Cannon', 'skin': 'No Skin', 'team': 4, 'time':
+        #18018150, 'type': 'spawn', 'perkBlue': 'Ultracapacitor', 'player': 2}
+        player = await server.get_player_by_number(event['player'])
+        if player:
+            await player.spawned()
 
 
     async def logPlanePositions(self, event, _, servers):
@@ -76,10 +85,14 @@ class Events(object):
         #twice with two different sets of data, I worry a little that some 
         #attributes might be overwritten.  Keep it on the radar
 
-        # TODO ADD A TIMEOUT timeout = 5
+        wait = .1
+        t = 0
         while not server.map.state == MapState.READY:
-            await asyncio.sleep(.1)
-            print('sleeping waiting for map to become available')
+            await asyncio.sleep(wait)
+            print('WARNING!!!! sleeping waiting for map to become available')
+            t+=wait
+            if t > 2:
+                print('WARNING!!!!!! Took over 2 seconds to parse map.  Continued anyway...')
         await server.map.parse(event)
 
         #might need to call a method here instead
@@ -87,9 +100,6 @@ class Events(object):
 
         server.map.state = MapState.ACTIVE
 
-
-        for sp in server.map.spawn_points:
-            print("SpawnPoint: %s" % await sp.describe())
 
 
     async def playerInfoEv(self, event, _, servers):
@@ -109,6 +119,7 @@ class Events(object):
         if player:
             player.set_team(event['team'])
         
+
     async def consoleCommandExecute(self, event, _, servers):
         #TODO Need to see if server (below) can be factored in to the init
         #method
@@ -120,12 +131,24 @@ class Events(object):
         # TODO Needs to be broken out into its own piece
         #
         if event['command'] == 'attach':
-            from_player = await server.get_player_by_name(event['arguments']['player'])
-            to_player = await server.get_player_by_name(event['arguments']['string'])
-            #get the coords from 
-            #overrideSpawnPoint x y angle would work, but you have to die then
-            #wait to spawn, plus I only want it to last for one life then reset
-            #back to normal and Im not sure how to set it back yet
+            from_player = await server.get_player_by_vaporId(event['source'])
+            to_player = await server.get_player_by_name(event['arguments'][0])
+            
+            #after we have fun playing around with it, lock it down to same
+            #team only
+            #NOTE In some games we might also wnat to consider limiting attach
+            # to only certain plane types
+
+            #if not from_player.team == to_player.team:
+            #    from_player.whisper('You can only attach to members of your own team!')
+            #    return
+            await server.overrideSpawnPoint(from_player.player, to_player.x, to_player.y, 0)
+            # pass x=0,y=0,angle=0 to clear the override and resume normal
+            # spawning rules for a target player, otherwise overrides are
+            # cleared on map change (after "mapLoading" but before "mapChange")
+            # and on player disconnection
+            
+            #spawnPoint is reset with 'spawn' event
 
 
 class Worker(Events):

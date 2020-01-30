@@ -17,17 +17,15 @@ class Server(base.Base, commands.Commands):
         self.mapList = list() # can these be added to dynamically? check commands
         self.mapRotationList = list()
 
-
-        self.active_map = None
+        self.map = None
 
     # NOTE
     # Load and Unload module methods have to be on the worker threads since
     # they executre in their own environment
     # I'm 90% sure
-
-    async def set_active_map(self, map):
-        print('Setting active_map on server %s to %s' % (self.serverName, map.name))
-        self.active_map = map
+    async def set_map(self, map):
+        print('Setting map on server %s to %s' % (self.serverName, map.name))
+        self.map = map
 
     async def add_player(self, player, message=True):
         print('Adding player to server %s with %s' % (self.serverName, player.vaporId))

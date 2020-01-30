@@ -21,6 +21,7 @@ LAUNCHER_CONFIG = '/home/sean/altitude/servers/launcher_config.xml'
 from pyaltitude import commands
 from pyaltitude.base import Base
 from pyaltitude.map import Map
+from pyaltitude.enums import MapState
 from pyaltitude.player import Player
 from pyaltitude.server import Server
 from pyaltitude.modules import *
@@ -55,22 +56,45 @@ class Events(object):
     async def mapLoading(self, event, _,servers):
         server = servers[event['port']]
         print("MapLoading: %s" % event)
+        #{'port': 27279, 'time': 16501201, 'type': 'mapLoading', 'map':'ffa_core'}
+        # THis event gives us the map name which is enough to
+        # instatiate the map object and begin parsing the map 
+        # file for what we need:
+        #    * right now just the spawn points so we can reset to them
+        #      after an /attach to a player
+        map_ = Map(server, event['map'])
+        await map_.parse_alte()
+        server.map = map_
 
 
     async def mapChange(self, event, _, servers):
         server = servers[event['port']]
         #{"mode":"ball","rightTeam":5,"port":27278,"leftTeam":6,"time":5808529,"type":"mapChange","map":"ball_cave"}
-        map_ = Map(server)
-        map_ = await map_.parse(event)
+        print("MapChange: %s" % event)
+
+        #NOTE since we are essentially parsing/instantiating the Map object
+        #twice with two different sets of data, I worry a little that some 
+        #attributes might be overwritten.  Keep it on the radar
+
+        # TODO ADD A TIMEOUT timeout = 5
+        while not server.map.state == MapState.READY:
+            await asyncio.sleep(.1)
+            print('sleeping waiting for map to become available')
+        await server.map.parse(event)
+
         #might need to call a method here instead
         #map_.loadModules
 
-        await server.set_active_map(map_)
+        server.map.state = MapState.ACTIVE
+
+
+        for sp in server.map.spawn_points:
+            print("SpawnPoint: %s" % await sp.describe())
 
 
     async def playerInfoEv(self, event, _, servers):
         server = servers[event['port']]
-    #    #{"plane":"Loopy","level":1,"port":27278,"perkGreen":"No Green Perk","perkRed":"Tracker","team":2,"time":5808868,"type":"playerInfoEv","leaving":false,"perkBlue":"No Blue Perk","aceRank":0,"player":1}
+        #    #{"plane":"Loopy","level":1,"port":27278,"perkGreen":"No Green Perk","perkRed":"Tracker","team":2,"time":5808868,"type":"playerInfoEv","leaving":false,"perkBlue":"No Blue Perk","aceRank":0,"player":1}
         #print("playerInfoEv: %s" % event)
         player = await server.get_player_by_number(event['player'])
         if player:

@@ -1,10 +1,14 @@
-import uuid
+import uuid,time
+import aiofiles
+from threading import Thread, Event
+import subprocess
 
 from . import base
 from . import commands
 
 from aiologger import Logger
 
+COMMAND_PATH = '/home/sean/altitude/servers/command.txt'
 
 class Server(base.Base, commands.Commands):
     logger = Logger.with_default_handlers(name='pyaltitude.Server')
@@ -18,6 +22,19 @@ class Server(base.Base, commands.Commands):
         self.mapRotationList = list()
 
         self.map = None
+
+        self.log_planes_event = Event()
+        self.log_planes_thread = Thread(target=self.log_planes, args=(self.log_planes_event, ), daemon=True)
+
+
+    def log_planes(self, event):
+        this_cmd = "%s,console,logPlanePositions" % self.port
+        cmd = '/bin/echo "%s" >> %s' % (this_cmd, COMMAND_PATH)
+        while 1:
+            if event.is_set():
+                break
+            subprocess.run(cmd, shell=True)
+            time.sleep(.2)
 
     # NOTE
     # Load and Unload module methods have to be on the worker threads since
@@ -44,8 +61,19 @@ class Server(base.Base, commands.Commands):
                 await player.whisper('Hey %s!' % player.nickname)
                 await player.whisper('Welcome to %s!' % self.serverName)
 
+            player_count = len(self.get_players())
+            if player_count == 1:
+                #if players are in the arena, start the log planes thread
+                print('Starting log plane thread')
+                self.log_planes_thread.start()
+    
+            elif player_count == 0:
+                # if zero players, stop it
+                print('Stopping log plane thread')
+                self.log_planes_event.set()
+
             if message:
-                await self.serverMessage('%s players now in server' % len(self.get_players()))
+                await self.serverMessage('%s players now in server' % player_count)
             print([p.nickname for p in self.get_players()])
 
 

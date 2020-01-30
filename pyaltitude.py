@@ -5,8 +5,6 @@ import aiofiles
 import ujson
 import xml.etree.ElementTree as ET
 
-#from threading import Thread
-
 import logging
 from aiologger import Logger
 logging.basicConfig(level=logging.DEBUG)
@@ -139,7 +137,19 @@ class Events(object):
             #team only
             #NOTE In some games we might also wnat to consider limiting attach
             # to only certain plane types
-            
+            if from_player.team and from_player.team == 2:
+                await from_player.message("Can't attach from spec")
+                return
+            if to_player.team and to_player.team == 2:
+                await from_player.whisper("Can't attach to a player in spec")
+                return
+            if not to_player.is_alive():
+                await from_player.whisper("Can't attach. %s is dead!" % to_player.nickname)
+                return
+            if from_player.attached:
+                await from_player.whisper("You've already attached once this life!")
+                return
+
             #if from_player == to_player:
             #    await from_player.whisper('Not a chance!!')
             #    return
@@ -235,6 +245,7 @@ class WorkerManager(object):
 #         
 #         t = Thread(target=start_loop, args=(new_loop,))
 #         t.start()
+
 
 class Main(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Main')

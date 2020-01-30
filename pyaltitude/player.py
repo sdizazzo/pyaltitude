@@ -49,7 +49,14 @@ class Player(base.Base):
         if self.attached:
             await asyncio.sleep(1)
             await self.server.overrideSpawnPoint(self.nickname, 0, 0, 0)
-            self.attached = False
+        self.attached = False
+
+    def is_alive(self):
+        if self.team == 2 or (self.x, self.y) == (-1, -1)
+            return False
+        else:
+            return True
+
     def is_bot(self):
         return int(self.vaporId) == 0
 

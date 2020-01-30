@@ -93,6 +93,7 @@ class Events(object):
             t+=wait
             if t > 2:
                 print('WARNING!!!!!! Took over 2 seconds to parse map.  Continued anyway...')
+                break
         await server.map.parse(event)
 
         #might need to call a method here instead
@@ -138,11 +139,17 @@ class Events(object):
             #team only
             #NOTE In some games we might also wnat to consider limiting attach
             # to only certain plane types
-
-            #if not from_player.team == to_player.team:
+            
+            #if from_player == to_player:
+            #    await from_player.whisper('Not a chance!!')
+            #    return
+            #elif not from_player.team == to_player.team:
             #    from_player.whisper('You can only attach to members of your own team!')
             #    return
-            await server.overrideSpawnPoint(from_player.player, to_player.x, to_player.y, 0)
+            await from_player.whisper('Attaching to %s' % to_player.nickname)
+            await to_player.whisper('%s is attaching to you!' % from_player.nickname)
+            await server.overrideSpawnPoint(from_player.nickname, to_player.x, to_player.y, 0)
+            from_player.attached = True
             # pass x=0,y=0,angle=0 to clear the override and resume normal
             # spawning rules for a target player, otherwise overrides are
             # cleared on map change (after "mapLoading" but before "mapChange")

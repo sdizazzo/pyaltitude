@@ -1,6 +1,7 @@
 import uuid,time
 import aiofiles
 from threading import Thread, Event
+
 import subprocess
 
 from . import base
@@ -45,12 +46,12 @@ class Server(base.Base, commands.Commands):
         self.map = map
 
     async def add_player(self, player, message=True):
-        print('Adding player to server %s with %s' % (self.serverName, player.vaporId))
+        print('Adding player %s to server %s' % (player.nickname, self.serverName))
         self.players.append(player)
         await self.players_changed(player, True, message=message)
 
     async def remove_player(self, player, message=True):
-        print('Removing player from server %s with %s' % (self.serverName, player.vaporId))
+        print('Removing player %s from server %s' % (player.nickname, self.serverName))
         self.players.remove(player)
         await self.players_changed(player, False, message=message)
 
@@ -64,12 +65,12 @@ class Server(base.Base, commands.Commands):
             player_count = len(self.get_players())
             if player_count == 1:
                 #if players are in the arena, start the log planes thread
-                print('Starting log plane thread')
+                print('Starting log plane thread on %s' % self.serverName)
                 self.log_planes_thread.start()
     
             elif player_count == 0:
                 # if zero players, stop it
-                print('Stopping log plane thread')
+                print('Stopping log plane thread on %s' % self.serverName)
                 self.log_planes_event.set()
 
             if message:

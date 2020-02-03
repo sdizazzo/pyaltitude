@@ -17,6 +17,7 @@ class Player(base.Base):
         self.y = -1
         self.team = None
         self.attached = False
+        self.last_attached_player = None
         #{"powerup":"Ball","positionY":1050,"playerVelX":-4.4,"playerVelY":-3.7,"port":27278,"velocityX":0,"time":389501,"type":"powerupPickup","velocityY":0,"player":2,"positionX":2036}
         #{"powerup":"Ball","positionY":158.65,"port":27278,"velocityX":-4.41,"time":1054454,"type":"powerupUse","velocityY":3.65,"player":4,"positionX":1191.59}
         self.powerup = None
@@ -52,7 +53,7 @@ class Player(base.Base):
         self.attached = False
 
     def is_alive(self):
-        if self.team == 2 or (self.x, self.y) == (-1, -1)
+        if self.team == 2 or (self.x, self.y) == (-1, -1):
             return False
         else:
             return True

@@ -4,10 +4,12 @@ import asyncio
 import aiofiles
 import ujson
 import xml.etree.ElementTree as ET
+import concurrent.futures
 
 import logging
 from aiologger import Logger
 logging.basicConfig(level=logging.DEBUG)
+
 
 #TODO config module
 # paths are currently hardcoded in individual mods
@@ -23,7 +25,7 @@ from pyaltitude.enums import MapState
 from pyaltitude.player import Player
 from pyaltitude.server import Server
 from pyaltitude.modules import *
-
+#from pyaltitude.custom_commands import attach
 
 class Events(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Events')
@@ -60,6 +62,7 @@ class Events(object):
         server = servers[event['port']]
         await server.map_player_positions(event)
 
+
     async def mapLoading(self, event, _,servers):
         server = servers[event['port']]
         print("MapLoading: %s" % event)
@@ -93,12 +96,7 @@ class Events(object):
                 print('WARNING!!!!!! Took over 2 seconds to parse map.  Continued anyway...')
                 break
         await server.map.parse(event)
-
-        #might need to call a method here instead
-        #map_.loadModules
-
         server.map.state = MapState.ACTIVE
-
 
 
     async def playerInfoEv(self, event, _, servers):
@@ -118,6 +116,32 @@ class Events(object):
         if player:
             player.set_team(event['team'])
         
+    async def attach(self, server,from_player, to_player):
+        if from_player.team and from_player.team == 2:
+            await from_player.whisper("Can't attach from spec")
+            return
+        if to_player.team and to_player.team == 2:
+            await from_player.whisper("Can't attach to a player in spec")
+            return
+        if not to_player.is_alive():
+            await from_player.whisper("Can't attach. %s is dead!" % to_player.nickname)
+            return
+        if from_player.attached:
+            await from_player.whisper("You've already attached once this life!")
+            return
+
+        #if from_player == to_player:
+        #    await from_player.whisper('Not a chance!!')
+        #    return
+        #elif not from_player.team == to_player.team:
+        #    from_player.whisper('You can only attach to members of your own team!')
+        #    return
+        await from_player.whisper('Attaching to %s' % to_player.nickname)
+        await to_player.whisper('%s is attaching to you!' % from_player.nickname)
+        await server.overrideSpawnPoint(from_player.nickname, to_player.x, to_player.y, 0)
+        from_player.attached = True
+
+
 
     async def consoleCommandExecute(self, event, _, servers):
         #TODO Need to see if server (below) can be factored in to the init
@@ -129,44 +153,30 @@ class Events(object):
         #
         # TODO Needs to be broken out into its own piece
         #
-        if event['command'] == 'attach':
+        from_player = None
+        to_player = None
+        if event['command'] in ( 'a', 'attach'):
+            print('THE EVENT', event)
             from_player = await server.get_player_by_vaporId(event['source'])
-            to_player = await server.get_player_by_name(event['arguments'][0])
-            
-            #after we have fun playing around with it, lock it down to same
-            #team only
-            #NOTE In some games we might also wnat to consider limiting attach
-            # to only certain plane types
-            if from_player.team and from_player.team == 2:
-                await from_player.message("Can't attach from spec")
-                return
-            if to_player.team and to_player.team == 2:
-                await from_player.whisper("Can't attach to a player in spec")
-                return
-            if not to_player.is_alive():
-                await from_player.whisper("Can't attach. %s is dead!" % to_player.nickname)
-                return
-            if from_player.attached:
-                await from_player.whisper("You've already attached once this life!")
-                return
+            if event['command'] == 'a':
+                to_player = from_player.last_attached_player
+                if not to_player:
+                    await from_player.whisper("You haven't attached to anybody yet")
+                    return
+            else:
+                to_player = await server.get_player_by_name(event['arguments'][0])
+                from_player.last_attached_player = to_player
+        
+            await self.attach(server, from_player, to_player)
 
-            #if from_player == to_player:
-            #    await from_player.whisper('Not a chance!!')
-            #    return
-            #elif not from_player.team == to_player.team:
-            #    from_player.whisper('You can only attach to members of your own team!')
-            #    return
-            await from_player.whisper('Attaching to %s' % to_player.nickname)
-            await to_player.whisper('%s is attaching to you!' % from_player.nickname)
-            await server.overrideSpawnPoint(from_player.nickname, to_player.x, to_player.y, 0)
-            from_player.attached = True
-            # pass x=0,y=0,angle=0 to clear the override and resume normal
-            # spawning rules for a target player, otherwise overrides are
-            # cleared on map change (after "mapLoading" but before "mapChange")
-            # and on player disconnection
-            
-            #spawnPoint is reset with 'spawn' event
 
+        #command needs to be called dynamilcally instead
+        #Similarlly to modules
+        #THis is adding too much complexity for this week
+        ##TODO for when I am
+        #    command = Attach(server, from_player, to_player)
+        #    command.execute()
+            
 
 class Worker(Events):
     logger = Logger.with_default_handlers(name='pyaltitude.Worker')
@@ -177,7 +187,14 @@ class Worker(Events):
         self._worker = None
 
     def start(self):
-        self._worker = asyncio.create_task(self._start(self.queue, self.servers))
+        #
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # ITS THE BUG IVE BEEN LOOKING FOR!!!
+        # _start is never awaited!!!!!!
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #
+        the_worker = self._start(self.queue, self.servers)
+        self._worker = asyncio.create_task(the_worker)
 
 
     #
@@ -234,6 +251,7 @@ class WorkerManager(object):
         for _ in range(self.max_workers):
             worker = Worker(self.queue, self.servers)
             worker.start()
+            #await worker.start()
             self.workers.add(worker)
 
 
@@ -260,9 +278,26 @@ class Main(object):
         # parse config here and pass in
         # also determine which modules to load 
         # and pass in through to workers
-        self.worker_manager = WorkerManager(self.queue, self.servers, max_workers=10)
-        self.worker_manager.start_workers()
 
+        #
+        #want to a clean commit before going down this road!!
+        #
+        #with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+        #    worker = Worker(self.queue, self.servers)
+        #    #I want 10 to start
+        #    loop = asyncio.get_event_loop()
+        #    result = await loop.run_in_executor(pool, worker.start)
+
+        #    #completed, pending = await asyncio.wait(blocking_tasks)
+        #    #results = [t.result() for t in completed]
+
+        self.worker_manager = WorkerManager(self.queue, self.servers, max_workers=10)
+        #print('HERE')
+        ##the below never returns because the workers block when
+        # I wait for the response
+        #await self.worker_manager.start_workers()
+        #print('THERE')
+        self.worker_manager.start_workers()
         await self.init()
         await self.tail()
 

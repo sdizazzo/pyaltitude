@@ -1,4 +1,5 @@
 import uuid
+import time
 import asyncio
 
 from . import base
@@ -22,16 +23,16 @@ class Player(base.Base):
         #{"powerup":"Ball","positionY":158.65,"port":27278,"velocityX":-4.41,"time":1054454,"type":"powerupUse","velocityY":3.65,"player":4,"positionX":1191.59}
         self.powerup = None
 
-    async def parse(self, json):
+    def parse(self, json):
         self._json = json
-        await super().parse(json)
+        super().parse(json)
         self.vaporId = uuid.UUID(self.vaporId)
         # UNTESTED
         #if self.vaporId in self.server.admin_vaporIds:
         #    self.is_admin = True
         return self
 
-    async def parse_playerInfoEv(self, json):
+    def parse_playerInfoEv(self, json):
         for k, v in json.items():
             if not k in ('port', 'type', 'player'):
                 setattr(self, k, v)
@@ -39,17 +40,18 @@ class Player(base.Base):
     def set_team(self, team):
         self.team = team
 
-    async def whisper(self, message):
-        await self.server.serverWhisper(self.nickname, message)
+    def whisper(self, message):
+        self.server.serverWhisper(self.nickname, message)
 
-    async def applyForce(self, x, y):
-        await self.server.applyForce(self.player, x, y)
+    def applyForce(self, x, y):
+        self.server.applyForce(self.player, x, y)
 
-    async def spawned(self):
+    def spawned(self):
         #reset our spawn point after a call to /attach
         if self.attached:
-            await asyncio.sleep(1)
-            await self.server.overrideSpawnPoint(self.nickname, 0, 0, 0)
+            time.sleep(1) # where does this sleep run????  in a thread only is
+                          # acceptable...yes Worker()
+            self.server.overrideSpawnPoint(self.nickname, 0, 0, 0)
         self.attached = False
 
     def is_alive(self):

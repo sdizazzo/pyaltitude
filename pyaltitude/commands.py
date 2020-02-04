@@ -1,6 +1,6 @@
 #!/usr/bin/env python3.7
 
-import asyncio
+import subprocess
 
 class Commands(object):
 
@@ -10,44 +10,44 @@ class Commands(object):
         self.cmd = "%s,console," % self.port
 
 
-    async def _send(self, cmd_name, *args):
+    def _send(self, cmd_name, *args):
         this_cmd = self.cmd[:]
         this_cmd += cmd_name
         for arg in args:
             this_cmd += ' '+str(arg)
 
         cmd = '/bin/echo "%s" >> %s' % (this_cmd, self.command_path)
-        await asyncio.create_subprocess_shell(cmd)#,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+        subprocess.run(cmd, shell=True)#,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
 
-    async def listPlayers(self):
-        await self._send('listPlayers')
+    def listPlayers(self):
+        self._send('listPlayers')
 
-    async def serverWhisper(self, nick, message):
-        await self._send('serverWhisper', nick.replace(' ', '\ '), message)
+    def serverWhisper(self, nick, message):
+        self._send('serverWhisper', nick.replace(' ', '\ '), message)
 
-    async def serverMessage(self, message):
-        await self._send('serverMessage', message)
+    def serverMessage(self, message):
+        self._send('serverMessage', message)
 
-    async def changeMap(self, map):
-        await self._send('changeMap', map)
+    def changeMap(self, map):
+        self._send('changeMap', map)
 
-    async def applyForce(self, player, x, y):
-        await self._send('applyForce', player, x, y)
+    def applyForce(self, player, x, y):
+        self._send('applyForce', player, x, y)
 
-    async def assignTeam(self, nick, team):
-        await self._send('asignTeam', nick, team)
+    def assignTeam(self, nick, team):
+        self._send('asignTeam', nick, team)
 
-    async def balanceTeams(self):
-        await self._send('balanceTeams')
+    def balanceTeams(self):
+        self._send('balanceTeams')
 
-    async def testGravityMode(self, mode):
-        await self._send('testGravityMode', mode)
+    def testGravityMode(self, mode):
+        self._send('testGravityMode', mode)
 
-    async def testCameraViewScale(self, scale):
-        await self._send('testCameraViewScale', scale)
+    def testCameraViewScale(self, scale):
+        self._send('testCameraViewScale', scale)
 
-    async def overrideSpawnPoint(self, nick, x, y, angle):
-        await self._send('overrideSpawnPoint', nick.replace(' ', '\ '), x, y, angle)
+    def overrideSpawnPoint(self, nick, x, y, angle):
+        self._send('overrideSpawnPoint', nick.replace(' ', '\ '), x, y, angle)
 
-    async def overrideBallScore(self, leftscore, rightscore):
-        await self._send('overrideBallScore', leftscore, rightscore)
+    def overrideBallScore(self, leftscore, rightscore):
+        self._send('overrideBallScore', leftscore, rightscore)

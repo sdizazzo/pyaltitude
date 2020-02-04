@@ -21,9 +21,9 @@ class SpawnPoint(base.Base):
 
     
     #it's not really json...
-    async def parse(self, json):
+    def parse(self, json):
         self._json = json
-        await super().parse(json, convert_types=True)
+        super().parse(json, convert_types=True)
 
         return self
         
@@ -43,14 +43,14 @@ class Map(base.Base):
         self.state = enums.MapState.INITIALIZED
 
 
-    async def parse_alte(self):
+    def parse_alte(self):
         self.state = enums.MapState.LOADING
         self.raw_xml = self._extract_xml()
-        await self._parse_map()
+        self._parse_map()
         self.state = enums.MapState.READY
 
 
-    async def _parse_map(self):
+    def _parse_map(self):
         
         #
         #just grab the spawnPoints so far...
@@ -62,7 +62,7 @@ class Map(base.Base):
             sp = SpawnPoint()
             # <spawnPoints layer="1" x="194" y="580" orientation="0.0">
             #but then passed in as a dict
-            await sp.parse(xspawn.attrib)
+            sp.parse(xspawn.attrib)
             team = xspawn.find('team')
             sp.team = int(team.attrib['index'])
             
@@ -92,9 +92,9 @@ class Map(base.Base):
             return fi.read(alte_length)
 
 
-    async def parse(self, json):
+    def parse(self, json):
         self._json = json
-        await super().parse(json)
+        super().parse(json)
 
         self.name = self.map
 

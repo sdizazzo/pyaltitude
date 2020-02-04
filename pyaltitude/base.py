@@ -14,18 +14,18 @@ class Base(object):
     """
         Objects subclass from this and json responses will be populated as
         instance variables automatically after calling 
-        `await super().parse(attrs)`
+        `super().parse(attrs)`
 
         No boilerplate!
     """
-    async def parse(self, json_dict, convert_types=False):
+    def parse(self, json_dict, convert_types=False):
         for k, v in json_dict.items():
             if convert_types:
-                v = await self.convert_value(v)
+                v = self.convert_value(v)
             setattr(self, k, v)
 
     
-    async def convert_value(self, v):
+    def convert_value(self, v):
         if v == 'true':
             return True
         elif v == 'false':
@@ -36,5 +36,5 @@ class Base(object):
             return float(v)
         return v
 
-    async def describe(self):
+    def describe(self):
         return pp.pformat({k:v for k,v in self.__dict__.items() if k != '_json'})

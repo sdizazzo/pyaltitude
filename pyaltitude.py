@@ -8,6 +8,8 @@ import concurrent.futures
 import queue
 import time
 import logging
+import traceback
+
 from aiologger import Logger
 logging.basicConfig(level=logging.DEBUG)
 import threading
@@ -31,26 +33,27 @@ from pyaltitude.modules import *
 class Events(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Events')
 
-    def clientAdd(self, event, INIT, servers):
-        server = servers[event['port']]
+    def clientAdd(self, event, INIT):
+        server = self.servers[event['port']]
         player = Player(server)
         player = player.parse(event)
         server.add_player(player, message =not INIT)
 
 
-    def clientRemove(self, event, INIT,servers):
-        #get the server first, and then the player from that
-        server = servers[event['port']]
+    def clientRemove(self, event, INIT):
+        server = self.servers[event['port']]
         #NOTE 
         # BUG player is None sometimes here and I dont understand why yet
         #Its a race condition.  Not sure if it matters or not yet
         # seems not to so I'll leave it as is for now and worry later
+
+        # see https://github.com/sdizazzo/pyaltitude/issues/4
         player = server.get_player_by_vaporId(event['vaporId'])
         if player:
             server.remove_player(player, message =not INIT)
 
-    def spawn(self, event, _, servers):
-        server = servers[event['port']]
+    def spawn(self, event, _):
+        server = self.servers[event['port']]
         #{'plane': 'Biplane', 'port': 27280, 'perkGreen': 'Heavy Armor',
         #'perkRed': 'Heavy Cannon', 'skin': 'No Skin', 'team': 4, 'time':
         #18018150, 'type': 'spawn', 'perkBlue': 'Ultracapacitor', 'player': 2}
@@ -58,14 +61,13 @@ class Events(object):
         if player:
             player.spawned()
 
-
-    def logPlanePositions(self, event, _, servers):
-        server = servers[event['port']]
+    def logPlanePositions(self, event, _):
+        server = self.servers[event['port']]
         server.map_player_positions(event)
 
 
-    def mapLoading(self, event, _,servers):
-        server = servers[event['port']]
+    def mapLoading(self, event, _):
+        server = self.servers[event['port']]
         print("MapLoading: %s" % event)
         #{'port': 27279, 'time': 16501201, 'type': 'mapLoading', 'map':'ffa_core'}
         # THis event gives us the map name which is enough to
@@ -77,9 +79,13 @@ class Events(object):
         map_.parse_alte()
         server.map = map_
 
+    def serverHitch(self, event, _):
+        #{"duration":631.8807983398438,"port":27278,"time":3367621,"type":"serverHitch","changedMap":false}
+        server = self.servers[event['port']]
+        server.serverMessage("ServerHitch: %.2f" % event['duration'])
 
-    def mapChange(self, event, _, servers):
-        server = servers[event['port']]
+    def mapChange(self, event, _):
+        server = self.servers[event['port']]
         #{"mode":"ball","rightTeam":5,"port":27278,"leftTeam":6,"time":5808529,"type":"mapChange","map":"ball_cave"}
         print("MapChange: %s" % event)
 
@@ -100,29 +106,34 @@ class Events(object):
         server.map.parse(event)
         server.map.state = MapState.ACTIVE
 
-
-    def playerInfoEv(self, event, _, servers):
-        server = servers[event['port']]
+ 
+    def playerInfoEv(self, event, _):
+        server = self.servers[event['port']]
         #    #{"plane":"Loopy","level":1,"port":27278,"perkGreen":"No Green Perk","perkRed":"Tracker","team":2,"time":5808868,"type":"playerInfoEv","leaving":false,"perkBlue":"No Blue Perk","aceRank":0,"player":1}
         #print("playerInfoEv: %s" % event)
         player = server.get_player_by_number(event['player'])
+        
+        #Events can come after a player has already been removed from the server object
+        # ANything that queries for the player_by_number can return None
+        # OR EVEN the wrong player perhaps
         if player:
             player.parse_playerInfoEv(event)
             
 
-    def teamChange(self, event, _, servers):
-        server = servers[event['port']]
+    def teamChange(self, event, _):
+        server = self.servers[event['port']]
         #{"port":27278,"team":2,"time":5808868,"type":"teamChange","player":0}
         player = server.get_player_by_number(event['player'])
         #print("Set team: %s" % event)
         if player:
             player.set_team(event['team'])
-        
-    def attach(self, server,from_player, to_player):
-        if from_player.team and from_player.team == 2:
+    
+
+    def attach(self, server, from_player, to_player):
+        if from_player.team == 2:
             from_player.whisper("Can't attach from spec")
             return
-        if to_player.team and to_player.team == 2:
+        if to_player.team == 2:
             from_player.whisper("Can't attach to a player in spec")
             return
         if not to_player.is_alive():
@@ -141,14 +152,15 @@ class Events(object):
         from_player.whisper('Attaching to %s' % to_player.nickname)
         to_player.whisper('%s is attaching to you!' % from_player.nickname)
         server.overrideSpawnPoint(from_player.nickname, to_player.x, to_player.y, 0)
+        #/assignteam nickname 0 or 1 left or right
+        # but need to lookup how we determine which is which for the player
+        #p.team == self.map.leftTeam
+        server.assignTeam(from_player.nickname, 0 if from_player.team == server.map.leftTeam else 1)
         from_player.attached = True
 
 
-
-    def consoleCommandExecute(self, event, _, servers):
-        #TODO Need to see if server (below) can be factored in to the init
-        #method
-        server = servers[event['port']]
+    def consoleCommandExecute(self, event, _):
+        server = self.servers[event['port']]
 
         #
         # Custom commands - More shit to do!!!
@@ -204,11 +216,13 @@ class Worker(Events):
         # SERVER
         # 
         # Will do for all (server?) modules
-        mods = (shockwave.ShockWaveModule, )
+        mods = (shockwave.ShockWaveModule, turf.Turf)
         for module in mods:
+            module.servers = self.servers
             for func_name in get_module_events(module()):
                 func = getattr(module(), func_name)
                 setattr(self, func_name, func)
+
         (line, INIT) = self.queue.get()
         event = ujson.loads(line)
         try:            
@@ -219,7 +233,7 @@ class Worker(Events):
             #NOT IMPLEMENTED!!!!!
             #
             return
-        method(event, INIT, self.servers)           
+        method(event, INIT)           
         self.queue.task_done()
                 
 
@@ -237,8 +251,12 @@ class Main(object):
         # parse config here and pass in
         # also determine which modules to load 
         # and pass in through to workers
+        #loop = asyncio.get_running_loop()
+        def callback(fut):
+            exception = fut.exception()
+            if exception:
+                print('Worker exception (callback): %s' % repr(exception))
 
-        loop = asyncio.get_running_loop()
 
         tail_thread=threading.Thread(target=self.tail, daemon=True)
         tail_thread.start()
@@ -251,11 +269,23 @@ class Main(object):
             #
             # one NOTE is that I dont want to have to load modules
             # on every event worry about that later
+            loop = asyncio.get_running_loop()
             while True:
-                worker = Worker(self.queue, self.servers)
-                result = await loop.run_in_executor(pool, worker.execute)
-                #print(result.result())
+                try:
+                    worker = Worker(self.queue, self.servers)
+                    future = loop.run_in_executor(pool, worker.execute)
+                    future.add_done_callback(callback)
+                    await future
+                except asyncio.CancelledError as e:
+                    break
+                except Exception as e:
+                    print("Worker exception: %s" % repr(e))
+                    print(traceback.format_exc())
                 await asyncio.sleep(.1)
+                #finally:
+                #    print("Worker finished")
+
+            pool.shutdown(wait=False)
 
 
 

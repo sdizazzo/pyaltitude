@@ -13,7 +13,7 @@ class ShockWaveModule(module.GameModeModule):
         super().__init__(self, mode)
 
 
-    def kill(self, event, _, servers):
+    def kill(self, event, _):
         #{"victimPositionY":407.63,"victimVelocityX":1.17,"streak":3,"source":"plane","type":"kill","victimPositionX":1395.17,"victimVelocityY":2.63,"multi":3,"port":27278,"xp":10,"victim":0,"time":12800875,"player":11}
         def jiggle(multi, team):
             if not team: return
@@ -28,8 +28,12 @@ class ShockWaveModule(module.GameModeModule):
                 #time.sleep(.1)
                 #player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
-        server = servers[event['port']]
+        server = self.servers[event['port']]
+        if not server.map.state.ACTIVE: return
+
         player = server.get_player_by_number(event['player'])
+        if not player: return
+
         teams = server.get_players_by_team()
         if event['multi'] > 1:
             if player in teams['leftTeam']:
@@ -37,7 +41,7 @@ class ShockWaveModule(module.GameModeModule):
             else:
                 jiggle(event['multi'], teams.get('leftTeam'))
 
-    def structureDamage(self, event, _, servers):
+    def structureDamage(self, event, _):
         def jiggle(team):
             if not team: return
 
@@ -50,10 +54,13 @@ class ShockWaveModule(module.GameModeModule):
                 time.sleep(.2)
                 player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
-        server = servers[event['port']]
+        server = self.servers[event['port']]
+        if not server.map.state.ACTIVE: return
         # for testing
         #{"positionY":475,"port":27278,"exactXp":31.25,"xp":31,"time":5135540,"type":"structureDamage","player":3,"target":"base","positionX":3184}  
         player = server.get_player_by_number(event['player'])
+        if not player: return
+
         teams = server.get_players_by_team()
         if event['target'] == 'base':
             if player in teams['leftTeam']:
@@ -61,17 +68,22 @@ class ShockWaveModule(module.GameModeModule):
             else:
                 jiggle(teams.get('leftTeam'))
 
-    def structureDestroy(self, event, _, servers):
+    def structureDestroy(self, event, _):
         def jiggle(team):
             for player in team:
                 if not player.is_bot():
                     player.whisper('SHRAPNAL INCOMING FROM DESTROYED TURRET!')
                 player.applyForce(random.randrange(-10,10),random.randrange(-10,10))
-                time.sleep(.1)
+                time.sleep(.2)
                 player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
-        server = servers[event['port']]
+        
+        server = self.servers[event['port']]
+        if not server.map.state.ACTIVE: return
+        
         player = server.get_player_by_number(event['player'])
+        if not player: return
+
         teams = server.get_players_by_team()
         if event['target'] == 'turret':
             if player in teams.get('leftTeam'):

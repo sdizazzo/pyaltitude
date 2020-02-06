@@ -42,6 +42,7 @@ class Map(base.Base):
 
         self.state = enums.MapState.INITIALIZED
 
+        self.game_start = 0
 
     def parse_alte(self):
         self.state = enums.MapState.LOADING
@@ -97,7 +98,8 @@ class Map(base.Base):
         super().parse(json)
 
         self.name = self.map
-
+        self.game_start = self.time
+        
         return self
 
 if __name__ == "__main__":

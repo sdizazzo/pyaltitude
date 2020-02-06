@@ -26,8 +26,9 @@ class Server(base.Base, commands.Commands):
 
         self.map = None
 
-        self.log_planes_event = Event()
         self.log_planes_thread = None
+        self.log_planes_event = Event()
+
 
     def log_planes(self, event):
         this_cmd = "%s,console,logPlanePositions" % self.port
@@ -43,6 +44,7 @@ class Server(base.Base, commands.Commands):
     # they executre in their own environment
     # I'm 90% sure
     def set_map(self, map):
+        #TODO I don't believe we need this method
         print('Setting map on server %s to %s' % (self.serverName, map.name))
         self.map = map
 
@@ -64,17 +66,18 @@ class Server(base.Base, commands.Commands):
                 player.whisper('Welcome to %s!' % self.serverName)
 
             player_count = len(self.get_players())
-            if player_count == 1:
-                #if players are in the arena, start the log planes thread
+            if player_count == 1 and not self.log_planes_thread:
+                #when the first player enters the arena, start the log planes thread
                 print('Starting log plane thread on %s' % self.serverName)
                 self.log_planes_thread = Thread(target=self.log_planes, args=(self.log_planes_event, ),daemon=True)
                 self.log_planes_thread.start()
     
             elif player_count == 0:
-                # if zero players, stop it
+                # last player leaves, stop it
                 print('Stopping log plane thread on %s' % self.serverName)
                 self.log_planes_event.set()
                 time.sleep(1)
+                self.log_planes_thread = None
                 self.log_planes_event = Event()
 
             if message:

@@ -35,7 +35,7 @@ class Commands(object):
         self._send('applyForce', player, x, y)
 
     def assignTeam(self, nick, team):
-        self._send('asignTeam', nick, team)
+        self._send('assignTeam', nick, team)
 
     def balanceTeams(self):
         self._send('balanceTeams')

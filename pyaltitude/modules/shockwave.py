@@ -29,6 +29,7 @@ class ShockWaveModule(module.GameModeModule):
                 #player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
         server = self.servers[event['port']]
+        if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
 
         player = server.get_player_by_number(event['player'])
@@ -55,6 +56,7 @@ class ShockWaveModule(module.GameModeModule):
                 player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
         server = self.servers[event['port']]
+        if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
         # for testing
         #{"positionY":475,"port":27278,"exactXp":31.25,"xp":31,"time":5135540,"type":"structureDamage","player":3,"target":"base","positionX":3184}  
@@ -79,6 +81,7 @@ class ShockWaveModule(module.GameModeModule):
 
         
         server = self.servers[event['port']]
+        if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
         
         player = server.get_player_by_number(event['player'])

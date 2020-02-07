@@ -142,19 +142,17 @@ class Events(object):
         if from_player.attached:
             from_player.whisper("You've already attached once this life!")
             return
-
-        #if from_player == to_player:
-        #    from_player.whisper('Not a chance!!')
-        #    return
-        #elif not from_player.team == to_player.team:
-        #    from_player.whisper('You can only attach to members of your own team!')
-        #    return
+        if from_player == to_player:
+            from_player.whisper('Not a chance!!')
+            return
+        elif not from_player.team == to_player.team:
+            from_player.whisper('You can only attach to members of your own team!')
+            return
+        
         from_player.whisper('Attaching to %s' % to_player.nickname)
         to_player.whisper('%s is attaching to you!' % from_player.nickname)
+        
         server.overrideSpawnPoint(from_player.nickname, to_player.x, to_player.y, 0)
-        #/assignteam nickname 0 or 1 left or right
-        # but need to lookup how we determine which is which for the player
-        #p.team == self.map.leftTeam
         server.assignTeam(from_player.nickname, 0 if from_player.team == server.map.leftTeam else 1)
         from_player.attached = True
 

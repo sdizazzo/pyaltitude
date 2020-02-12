@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.7
 
+import os
 import asyncio
 import aiofiles
 import ujson
@@ -9,6 +10,8 @@ import queue
 import time
 import logging
 import traceback
+
+from functools import partial
 
 from aiologger import Logger
 logging.basicConfig(level=logging.DEBUG)
@@ -97,7 +100,6 @@ class Events(object):
         t = 0
         while not server.map.state == MapState.READY:
             time.sleep(wait)
-            #await asyncio.sleep(wait)
             print('WARNING!!!! sleeping waiting for map to become available')
             t+=wait
             if t > 2:
@@ -214,7 +216,7 @@ class Worker(Events):
         # SERVER
         # 
         # Will do for all (server?) modules
-        mods = (shockwave.ShockWaveModule, turf.Turf)
+        mods = (shockwave.ShockWaveModule, king_game.KingGame)
         for module in mods:
             module.servers = self.servers
             for func_name in get_module_events(module()):
@@ -231,6 +233,7 @@ class Worker(Events):
             #NOT IMPLEMENTED!!!!!
             #
             return
+        
         method(event, INIT)           
         self.queue.task_done()
                 
@@ -238,6 +241,7 @@ class Worker(Events):
 
 class Main(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Main')
+    
 
     async def run(self):
         self.servers = self.parse_server_config()
@@ -249,17 +253,23 @@ class Main(object):
         # parse config here and pass in
         # also determine which modules to load 
         # and pass in through to workers
-        #loop = asyncio.get_running_loop()
+
         def callback(fut):
             exception = fut.exception()
             if exception:
                 print('Worker exception (callback): %s' % repr(exception))
+                try:
+                    #get the result so we raise the exception
+                    # and get the traceback
+                    fut.result()
+                except Exception as e:
+                    print(traceback.format_exc())
 
 
         tail_thread=threading.Thread(target=self.tail, daemon=True)
         tail_thread.start()
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+        with concurrent.futures.ThreadPoolExecutor(min(32, os.cpu_count() + 4), thread_name_prefix='Worker-') as pool:
             # There is no worker concept with an endless loop.
             # the pool takes care of that for us
             # we just have a class/function that pulls from the 
@@ -273,20 +283,17 @@ class Main(object):
                     worker = Worker(self.queue, self.servers)
                     future = loop.run_in_executor(pool, worker.execute)
                     future.add_done_callback(callback)
-                    await future
                 except asyncio.CancelledError as e:
+                    #when hitting Ctrl-C
                     break
                 except Exception as e:
                     print("Worker exception: %s" % repr(e))
                     print(traceback.format_exc())
-                await asyncio.sleep(.1)
+                await asyncio.sleep(.01)
                 #finally:
                 #    print("Worker finished")
 
-            pool.shutdown(wait=False)
-
-
-
+    
     def tail(self):
         #seek to end of file and begin tailing
         with open(PATH, 'rt') as f:
@@ -294,7 +301,7 @@ class Main(object):
             while True:
                 line = f.readline()
                 if not line:
-                    time.sleep(0.1)
+                    time.sleep(0.01)
                     continue
                 self.queue.put((line, False))
 

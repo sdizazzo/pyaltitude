@@ -1,4 +1,4 @@
-import uuid,time
+import uuid, time
 import aiofiles
 from threading import Thread, Event
 
@@ -10,6 +10,10 @@ from . import commands
 from aiologger import Logger
 
 COMMAND_PATH = '/home/sean/altitude/servers/command.txt'
+
+class MockMap(object):
+    def __init__(self):
+        self.state = None
 
 class Server(base.Base, commands.Commands):
     logger = Logger.with_default_handlers(name='pyaltitude.Server')
@@ -24,7 +28,7 @@ class Server(base.Base, commands.Commands):
         self.mapList = list() # can these be added to dynamically? check commands
         self.mapRotationList = list()
 
-        self.map = None
+        self.map = MockMap()
 
         self.log_planes_thread = None
         self.log_planes_event = Event()
@@ -52,6 +56,7 @@ class Server(base.Base, commands.Commands):
         print('Adding player %s to server %s' % (player.nickname, self.serverName))
         self.players.append(player)
         self.players_changed(player, True, message=message)
+        #print(player.describe())
 
     def remove_player(self, player, message=True):
         print('Removing player %s from server %s' % (player.nickname, self.serverName))
@@ -66,13 +71,20 @@ class Server(base.Base, commands.Commands):
                 player.whisper('Welcome to %s!' % self.serverName)
 
             player_count = len(self.get_players())
-            if player_count == 1 and not self.log_planes_thread:
+            #
+            #TODO HACK!!!
+            #
+            # only log plane positions on King of the Hill
+            if self.port == 27282 and player_count == 1 and not self.log_planes_thread:
                 #when the first player enters the arena, start the log planes thread
                 print('Starting log plane thread on %s' % self.serverName)
                 self.log_planes_thread = Thread(target=self.log_planes, args=(self.log_planes_event, ),daemon=True)
                 self.log_planes_thread.start()
     
-            elif player_count == 0:
+            #
+            # TODO HACK!!!!
+            #
+            elif self.port == 27282 and player_count == 0:
                 # last player leaves, stop it
                 print('Stopping log plane thread on %s' % self.serverName)
                 self.log_planes_event.set()
@@ -89,9 +101,9 @@ class Server(base.Base, commands.Commands):
         #{"positionByPlayer":{"0":"776,726","1":"3028,683","2":"704,784","3":"3043,799","4":"652,733","5":"3095,748","6":"-1,-1"},"port":27278,"time":46699,"type":"logPlanePositions"}
         for pid, coords in event['positionByPlayer'].items():
             player = self.get_player_by_number(int(pid), bots=False)
-            x, y = coords.split(',')
             if not player:
                 continue
+            x, y = coords.split(',')
             player.x, player.y = (int(x), int(y))
 
     def get_players(self, bots=False):

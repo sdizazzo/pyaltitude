@@ -19,7 +19,11 @@ class Base(object):
         No boilerplate!
     """
     def parse(self, json_dict, convert_types=False):
+        #some attrs in the json dont belong on the object
+        #add them to the ignored keys
+        ignored_keys = ('type',)
         for k, v in json_dict.items():
+            if k in ignored_keys: continue
             if convert_types:
                 v = self.convert_value(v)
             setattr(self, k, v)

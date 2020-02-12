@@ -36,13 +36,17 @@ class Map(base.Base):
         self.server = server
         self.name = name
         self.path = os.path.join(map_dir, name+ '.altx')
-       
+
+        self.leftTeam = None
+        self.rightTeam = None
+
         self.teams = list() #??  Where does teams go ??
         self.spawn_points = list()
 
         self.state = enums.MapState.INITIALIZED
 
         self.game_start = 0
+
 
     def parse_alte(self):
         self.state = enums.MapState.LOADING
@@ -99,7 +103,6 @@ class Map(base.Base):
 
         self.name = self.map
         self.game_start = self.time
-        
         return self
 
 if __name__ == "__main__":

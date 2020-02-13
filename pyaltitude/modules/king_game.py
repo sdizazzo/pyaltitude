@@ -1,8 +1,9 @@
 import time
 from threading import Thread, Event, Lock
+
 from . import module
 from .. import map
-
+from .. import events
 
 class KingGame(module.MapModule):
     flag_timer_thread =None
@@ -103,7 +104,7 @@ class KingGame(module.MapModule):
         print('Thread ending...')
 
 
-    def roundEnd(self, event, _):
+    def roundEnd(self, event, _, thread_lock):
         server = self.servers[event['port']]
         if server.map.name != self.map_name: return
         KingGame.flag_timer_event.set()
@@ -112,8 +113,16 @@ class KingGame(module.MapModule):
         time.sleep(18)
         self.reset(server)
 
+    def mapChange(self, event, _, thread_lock):
+        #need to call the basic mapChange first!!
+        # then extend it with our stuff
+        events.Events.mapChange(self, event, _, thread_lock)
+        server = self.servers[event['port']]
+        KingGame.flag_timer_event.set()
+        time.sleep(2)
+        self.reset(server)
 
-    def powerupAutoUse(self, event, _):
+    def powerupAutoUse(self, event, _, thread_lock):
         server = self.servers[event['port']]
         # {"powerup":"Health","positionY":1641,"playerVelX":2.43,"playerVelY":-0.3,"port":27282,"velocityX":0,"time":169837,"type":"powerupAutoUse","velocityY":0,"player":0,"positionX":1502}
         if server.map.name != self.map_name: return
@@ -123,27 +132,27 @@ class KingGame(module.MapModule):
         player = server.get_player_by_number(event['player'])
         if not player: return
 
-        if not KingGame.flag_taken_by or KingGame.flag_taken_by.team != player.team:
-            if KingGame.flag_timer_thread:
-                #flag was taken by the other team
-                #print out how long it was held for and store it
-                #server.serverMessage()
-                self.flag_timer_event.set()
+        
+        with thread_lock:
+            if not KingGame.flag_taken_by or KingGame.flag_taken_by.team != player.team:
+                if KingGame.flag_timer_thread:
+                    #flag was taken back by the other team
+                    #print out how long it was held for and store it
+                    #server.serverMessage()
+                    self.flag_timer_event.set()
 
-            team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
-            other_color = 'orange' if team_color == 'blue' else 'blue'
-            server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
-            #server.serverMessage("The %s team needs to touch it within 60 seconds or %s will score a point!" % (other_color, team_color))  
-            
-            #since this is processed by many worker threads, its possible for
-            #one thread to set set the variable while another is past the if
-            #conditions so it will set it again.
+                team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
+                other_color = 'orange' if team_color == 'blue' else 'blue'
+                server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
+                #server.serverMessage("The %s team needs to touch it within 60 seconds or %s will score a point!" % (other_color, team_color))  
+                
+                #since this is processed by many worker threads, its possible for
+                #one thread to set set the variable while another is past the if
+                #conditions so it will set it again.
 
-            #
-            #NOTE I wonder if we're going to have to worry about locks everywhere!!!
-            #
-            flag_lock = Lock()
-            with flag_lock:
+                #
+                #NOTE I wonder if we're going to have to worry about locks everywhere!!!
+                #
                 KingGame.flag_taken_by = player
                 KingGame.flag_taken_at = event['time']
                 KingGame.flag_timer_event = Event()

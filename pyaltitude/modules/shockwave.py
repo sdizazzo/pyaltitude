@@ -13,7 +13,7 @@ class ShockWaveModule(module.GameModeModule):
         super().__init__(self, mode)
 
 
-    def kill(self, event, _):
+    def kill(self, event, _, thread_lock):
         #{"victimPositionY":407.63,"victimVelocityX":1.17,"streak":3,"source":"plane","type":"kill","victimPositionX":1395.17,"victimVelocityY":2.63,"multi":3,"port":27278,"xp":10,"victim":0,"time":12800875,"player":11}
         def jiggle(multi, team):
             if not team: return
@@ -42,7 +42,7 @@ class ShockWaveModule(module.GameModeModule):
             else:
                 jiggle(event['multi'], teams.get('leftTeam'))
 
-    def structureDamage(self, event, _):
+    def structureDamage(self, event, _, thread_lock):
         def jiggle(team):
             if not team: return
 
@@ -70,7 +70,7 @@ class ShockWaveModule(module.GameModeModule):
             else:
                 jiggle(teams.get('leftTeam'))
 
-    def structureDestroy(self, event, _):
+    def structureDestroy(self, event, _, thread_lock):
         def jiggle(team):
             for player in team:
                 if not player.is_bot():

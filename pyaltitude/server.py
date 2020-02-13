@@ -41,16 +41,16 @@ class Server(base.Base, commands.Commands):
             if event.is_set():
                 break
             subprocess.run(cmd, shell=True)
-            time.sleep(.5)
+            time.sleep(.3)
 
     # NOTE
     # Load and Unload module methods have to be on the worker threads since
     # they executre in their own environment
     # I'm 90% sure
-    def set_map(self, map):
-        #TODO I don't believe we need this method
-        print('Setting map on server %s to %s' % (self.serverName, map.name))
-        self.map = map
+    #def set_map(self, map):
+    #    #TODO I don't believe we need this method
+    #    print('Setting map on server %s to %s' % (self.serverName, map.name))
+    #    self.map = map
 
     def add_player(self, player, message=True):
         print('Adding player %s to server %s' % (player.nickname, self.serverName))

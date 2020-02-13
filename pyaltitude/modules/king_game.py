@@ -1,5 +1,5 @@
 import time
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from . import module
 from .. import map
 
@@ -133,11 +133,20 @@ class KingGame(module.MapModule):
             team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
             other_color = 'orange' if team_color == 'blue' else 'blue'
             server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
-            #server.serverMessage("The %s team needs to touch it within 60 seconds or %s will score a point!" % (other_color, team_color))
+            #server.serverMessage("The %s team needs to touch it within 60 seconds or %s will score a point!" % (other_color, team_color))  
+            
+            #since this is processed by many worker threads, its possible for
+            #one thread to set set the variable while another is past the if
+            #conditions so it will set it again.
 
-            KingGame.flag_taken_by = player
-            KingGame.flag_taken_at = event['time']
-            KingGame.flag_timer_event = Event()
-            KingGame.flag_timer_thread = Thread(target=self.flag_timer, args=(server, player, KingGame.flag_timer_event), daemon=True)
-            KingGame.flag_timer_thread.start() 
+            #
+            #NOTE I wonder if we're going to have to worry about locks everywhere!!!
+            #
+            flag_lock = Lock()
+            with flag_lock:
+                KingGame.flag_taken_by = player
+                KingGame.flag_taken_at = event['time']
+                KingGame.flag_timer_event = Event()
+                KingGame.flag_timer_thread = Thread(target=self.flag_timer, args=(server, player, KingGame.flag_timer_event), daemon=True)
+                KingGame.flag_timer_thread.start() 
 

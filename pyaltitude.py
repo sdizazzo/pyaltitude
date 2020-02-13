@@ -92,19 +92,16 @@ class Events(object):
         #{"mode":"ball","rightTeam":5,"port":27278,"leftTeam":6,"time":5808529,"type":"mapChange","map":"ball_cave"}
         print("MapChange: %s" % event)
 
-        #NOTE since we are essentially parsing/instantiating the Map object
-        #twice with two different sets of data, I worry a little that some 
-        #attributes might be overwritten.  Keep it on the radar
-
-        wait = .1
+        wait = .5
         t = 0
         while not server.map.state == MapState.READY:
             time.sleep(wait)
-            print('WARNING!!!! sleeping waiting for map to become available')
+            print('WARNING!!!! sleeping waiting for map to become available: %s' % server.map.name)
             t+=wait
-            if t > 2:
+            if t >= 2:
                 print('WARNING!!!!!! Took over 2 seconds to parse map.  Continued anyway...')
                 break
+        
         server.map.parse(event)
         server.map.state = MapState.ACTIVE
 

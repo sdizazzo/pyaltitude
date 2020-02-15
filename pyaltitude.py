@@ -39,8 +39,9 @@ from pyaltitude.modules import *
 class Worker(Events):
     logger = Logger.with_default_handlers(name='pyaltitude.Worker')
 
-    def __init__(self, queue, servers, thread_lock):
-        self.queue = queue
+    def __init__(self, line, init, servers, thread_lock):
+        self.line = line
+        self.init = init
         self.servers = servers
         self.thread_lock = thread_lock
 
@@ -68,8 +69,12 @@ class Worker(Events):
                 func = getattr(module(), func_name)
                 setattr(self, func_name, func)
 
-        (line, INIT) = self.queue.get()
-        event = ujson.loads(line)
+        try:
+            event = ujson.loads(self.line)
+        except ValueError:
+            print("ERROR: Worker could not parse log line: %s" % self.line)
+            raise
+
         try:            
             method = getattr(self, event['type'])
         except AttributeError as e:
@@ -79,10 +84,11 @@ class Worker(Events):
             #
             return
         
-        method(event, INIT, self.thread_lock)           
-        self.queue.task_done()
-                
+        method(event, self.init, self.thread_lock)
 
+        #not using join() yet so this is irrelevant
+        #self.queue.task_done()                
+        #print(self.queue.qsize())
 
 class Main(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Main')
@@ -125,22 +131,16 @@ class Main(object):
             # on every event worry about that later
             loop = asyncio.get_running_loop()
             while True:
+                #THIS NEEDS TO BLOCK OTHERWISE WE JUST SPIN OUR WHEELS!!!!!
+                (line, INIT) = self.queue.get()
                 try:
-                    worker = Worker(self.queue, self.servers, self.thread_lock)
+                    worker = Worker(line, INIT, self.servers, self.thread_lock)
                     future = loop.run_in_executor(pool, worker.execute)
                     future.add_done_callback(callback)
-                    #await'ing here basically makes this single threaded...
-                    # or at least synchronous 
-                    #await future
                 except asyncio.CancelledError as e:
                     #when hitting Ctrl-C
                     break
-                except Exception as e:
-                    print("Worker exception: %s" % repr(e))
-                    print(traceback.format_exc())
                 await asyncio.sleep(.01)
-                #finally:
-                #    print("Worker finished")
 
     
     def tail(self):

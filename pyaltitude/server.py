@@ -14,6 +14,7 @@ COMMAND_PATH = '/home/sean/altitude/servers/command.txt'
 class MockMap(object):
     def __init__(self):
         self.state = None
+        self.name = None
 
 class Server(base.Base, commands.Commands):
     logger = Logger.with_default_handlers(name='pyaltitude.Server')
@@ -109,7 +110,7 @@ class Server(base.Base, commands.Commands):
     def get_players(self, bots=False):
         pl = list()
         for p in self.players:
-            if not bots  and p.is_bot():
+            if not bots and p.is_bot():
                 continue
             pl.append(p)
         return pl

@@ -86,15 +86,13 @@ class Worker(Events):
         
         method(event, self.init, self.thread_lock)
 
-        #not using join() yet so this is irrelevant
-        #self.queue.task_done()                
-        #print(self.queue.qsize())
+
 
 class Main(object):
     logger = Logger.with_default_handlers(name='pyaltitude.Main')
     
 
-    async def run(self):
+    def run(self):
         self.servers = self.parse_server_config()
         self.queue = queue.Queue()
         self.thread_lock = Lock()
@@ -106,43 +104,40 @@ class Main(object):
         # also determine which modules to load 
         # and pass in through to workers
 
-        def callback(fut):
-            exception = fut.exception()
-            if exception:
-                print('Worker exception (callback): %s' % repr(exception))
-                try:
-                    #get the result so we raise the exception
-                    # and get the traceback
-                    fut.result()
-                except Exception as e:
-                    print(traceback.format_exc())
-
-
+        
         tail_thread=threading.Thread(target=self.tail, daemon=True)
         tail_thread.start()
 
+
         with concurrent.futures.ThreadPoolExecutor(min(32, os.cpu_count() + 4), thread_name_prefix='Worker-') as pool:
-            # There is no worker concept with an endless loop.
-            # the pool takes care of that for us
-            # we just have a class/function that pulls from the 
-            # queue and executes code against that event
-            #
             # one NOTE is that I dont want to have to load modules
             # on every event worry about that later
-            loop = asyncio.get_running_loop()
+            
             while True:
-                #THIS NEEDS TO BLOCK OTHERWISE WE JUST SPIN OUR WHEELS!!!!!
-                (line, INIT) = self.queue.get()
                 try:
+                    (line, INIT) = self.queue.get()
+                    #print('Submitting Worker for line: %s' % line.strip())
                     worker = Worker(line, INIT, self.servers, self.thread_lock)
-                    future = loop.run_in_executor(pool, worker.execute)
-                    future.add_done_callback(callback)
-                except asyncio.CancelledError as e:
+                    future = pool.submit(worker.execute)
+                    future.add_done_callback(self.worker_done_cb)
+                    time.sleep(.01)
+                except KeyboardInterrupt:
                     #when hitting Ctrl-C
                     break
-                await asyncio.sleep(.01)
 
-    
+
+    def worker_done_cb(self, fut):
+        exception = fut.exception()
+        if exception:
+            print('Worker exception (callback): %s' % repr(exception))
+            try:
+                #get the result so we raise the exception
+                # and get the traceback
+                fut.result()
+            except Exception as e:
+                print(traceback.format_exc())
+
+
     def tail(self):
         #seek to end of file and begin tailing
         with open(PATH, 'rt') as f:
@@ -153,7 +148,6 @@ class Main(object):
                     time.sleep(0.01)
                     continue
                 self.queue.put((line, False))
-
 
 
     def parse_server_config(self):
@@ -173,4 +167,5 @@ class Main(object):
  
 
 if __name__ == "__main__":
-    asyncio.run(Main().run())#, debug=True)
+    #asyncio.run(Main().run())#, debug=True)
+    Main().run()

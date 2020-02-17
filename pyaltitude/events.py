@@ -55,9 +55,19 @@ class Events(object):
         map_.parse_alte()
         server.map = map_
 
+
     def serverHitch(self, event, _, thread_lock):
         #{"duration":631.8807983398438,"port":27278,"time":3367621,"type":"serverHitch","changedMap":false}
         server = self.servers[event['port']]
+
+
+    def roundEnd(self, event, _, thread_lock):
+        pass
+
+
+    def powerupAutoUse(self, event, _, thread_lock):
+        pass
+
 
     def mapChange(self, event, _, thread_lock):
         server = self.servers[event['port']]
@@ -89,6 +99,7 @@ class Events(object):
         # OR EVEN the wrong player perhaps
         if player:
             player.parse_playerInfoEv(event)
+
 
     def teamChange(self, event, _, thread_lock):
         server = self.servers[event['port']]

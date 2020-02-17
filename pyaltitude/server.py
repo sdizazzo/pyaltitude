@@ -42,7 +42,7 @@ class Server(base.Base, commands.Commands):
             if event.is_set():
                 break
             subprocess.run(cmd, shell=True)
-            time.sleep(.3)
+            time.sleep(.2)
 
     # NOTE
     # Load and Unload module methods have to be on the worker threads since

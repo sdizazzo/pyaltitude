@@ -22,6 +22,18 @@ class KingGame(module.MapModule):
         # BECAUSE EACH WORKER WOULD GET A DIFFERNT
         # COPY!!!!!!!!!!! 
         
+        # Also dont forget that whenever updating a
+        # class variable, you must do it within the
+        # context of the thread lock ie.
+
+        # with thread_lock:
+        #     KingGame.flag_taken_by = player
+
+        #...BUT...  I believe that's only possible/necessary
+        # in the events, which are executed in the worker threads
+        # if modified in the main class, you shouldn't need
+        # to use the thread_lock
+
         #USE CLASS VARIABLES ABOVE INSTEAD!!!!
 
         super().__init__(self, map)
@@ -31,7 +43,7 @@ class KingGame(module.MapModule):
 
 
     def reset(self, server):
-        KingGame.flag_timer_thread =None
+        KingGame.flag_timer_thread = None
         KingGame.flag_timer_event = Event()
         KingGame.flag_taken_by = None
         KingGame.flag_taken_at = 0
@@ -47,7 +59,6 @@ class KingGame(module.MapModule):
         WAIT = 1
         while True:
             if event.is_set():
-                t = 0 # this seems superfluous
                 #It doesn't exist yet
                 #player.flag_hold_time += t
                 
@@ -61,10 +72,10 @@ class KingGame(module.MapModule):
 
             if t and t%60 == 0:
                 t = 0
-                #for i in range(10):
                 server.serverMessage("... DING! ...")
-                    #time.sleep(.1)
-                server.serverMessage('Score one for the %s!!!' % team_color)
+                server.serverMessage("... DING! ...")
+                server.serverMessage("... DING! ...")
+                server.serverMessage('Score one for the %ss!!!' % team_color)
 
                 left = 1 if player.team == server.map.leftTeam else 0
                 right = 1 if player.team == server.map.rightTeam else 0
@@ -77,26 +88,26 @@ class KingGame(module.MapModule):
             elif t == 40:
                 server.serverMessage('20 seconds remaining...  Entering danger zone!')
             elif t == 50:
-                server.serverMessage(".................................10")
+                server.serverMessage("...................................10")
             elif t == 51:
-                server.serverMessage("..............................9")
+                server.serverMessage("................................9")
             elif t == 52:
-                server.serverMessage("..........................8")
+                server.serverMessage("............................8")
             elif t == 53:
-                server.serverMessage("......................7")
+                server.serverMessage("........................7")
             elif t == 54:
-                server.serverMessage("...................6")
+                server.serverMessage("....................6")
             elif t == 55:
-                server.serverMessage("...............5")
+                server.serverMessage("................5")
             elif t == 56:
                 server.serverMessage("............4")
             elif t == 57:
                 server.serverMessage("........3")
             elif t == 58:
-                server.serverMessage(".....2")
+                server.serverMessage("....2")
             elif t == 59:
-                server.serverMessage("..1")
-            
+                server.serverMessage("1")
+ 
 
             time.sleep(WAIT)
             t +=1
@@ -104,27 +115,47 @@ class KingGame(module.MapModule):
         print('Thread ending...')
 
 
+    #################
+    # Events
+    #################
+
     def roundEnd(self, event, _, thread_lock):
+        events.Events.roundEnd(self, event, _, thread_lock)
+
         server = self.servers[event['port']]
         if server.map.name != self.map_name: return
-        KingGame.flag_timer_event.set()
-        time.sleep(2)
-        pass # <--- ???
-        time.sleep(18)
-        self.reset(server)
+        
+        with thread_lock:
+            KingGame.flag_timer_event.set()
+            time.sleep(2)
+            pass # <--- ???
+            time.sleep(18)
+            self.reset(server)
+
 
     def mapChange(self, event, _, thread_lock):
-        #need to call the basic mapChange first!!
+        # NOTE
+        # When  you override an event in a module, you
+        # need to call the basic mapChange first!!
         # then extend it with our stuff
+        #
+        #
+        # TODO This will get us closer to breaking
+        # out the modules into types: server, game, map
         events.Events.mapChange(self, event, _, thread_lock)
+
         server = self.servers[event['port']]
-        KingGame.flag_timer_event.set()
-        time.sleep(2)
-        self.reset(server)
+        if server.port == 27282:
+            with thread_lock:
+                KingGame.flag_timer_event.set()
+                time.sleep(2)
+                self.reset(server)
+
 
     def powerupAutoUse(self, event, _, thread_lock):
+        events.Events.powerupAutoUse(self, event, _, thread_lock)
+
         server = self.servers[event['port']]
-        # {"powerup":"Health","positionY":1641,"playerVelX":2.43,"playerVelY":-0.3,"port":27282,"velocityX":0,"time":169837,"type":"powerupAutoUse","velocityY":0,"player":0,"positionX":1502}
         if server.map.name != self.map_name: return
         if event['powerup'] != 'Health' or (event['positionX'], event['positionY']) != (1501, 1735): return
 
@@ -144,15 +175,7 @@ class KingGame(module.MapModule):
                 team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
                 other_color = 'orange' if team_color == 'blue' else 'blue'
                 server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
-                #server.serverMessage("The %s team needs to touch it within 60 seconds or %s will score a point!" % (other_color, team_color))  
                 
-                #since this is processed by many worker threads, its possible for
-                #one thread to set set the variable while another is past the if
-                #conditions so it will set it again.
-
-                #
-                #NOTE I wonder if we're going to have to worry about locks everywhere!!!
-                #
                 KingGame.flag_taken_by = player
                 KingGame.flag_taken_at = event['time']
                 KingGame.flag_timer_event = Event()

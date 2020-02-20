@@ -1,15 +1,13 @@
 import uuid
 import time
-import asyncio
 
 from . import base
 
-from aiologger import Logger
+import logging
 
-
+logger = logging.getLogger(__name__)
 
 class Player(base.Base):
-    logger = Logger.with_default_handlers(name='pyaltitude.Player')
 
     def __init__(self, server):
         self.is_admin = False
@@ -38,6 +36,8 @@ class Player(base.Base):
                 setattr(self, k, v)
 
     def set_team(self, team):
+        # Is this method even needed?
+        # I don't believe so.
         self.team = team
 
     def whisper(self, message):
@@ -49,8 +49,8 @@ class Player(base.Base):
     def spawned(self):
         #reset our spawn point after a call to /attach
         if self.attached:
-            time.sleep(1) # where does this sleep run????  in a thread only is
-                          # acceptable...yes Worker()
+            time.sleep(.5) # where does this sleep run????  in a thread only is
+                           # acceptable...yes Worker()
             self.server.overrideSpawnPoint(self.nickname, 0, 0, 0)
         self.attached = False
 

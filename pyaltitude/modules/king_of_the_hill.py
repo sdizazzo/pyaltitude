@@ -1,11 +1,15 @@
 import time
+import logging
 from threading import Thread, Event, Lock
 
 from . import module
 from .. import map
 from .. import events
 
-class KingGame(module.MapModule):
+logger = logging.getLogger(__name__)
+
+class KOTH(module.MapModule):
+
     flag_timer_thread =None
     flag_timer_event = Event()
     flag_taken_by = None
@@ -27,7 +31,7 @@ class KingGame(module.MapModule):
         # context of the thread lock ie.
 
         # with thread_lock:
-        #     KingGame.flag_taken_by = player
+        #     KOTH.flag_taken_by = player
 
         #...BUT...  I believe that's only possible/necessary
         # in the events, which are executed in the worker threads
@@ -43,18 +47,20 @@ class KingGame(module.MapModule):
 
 
     def reset(self, server):
-        KingGame.flag_timer_thread = None
-        KingGame.flag_timer_event = Event()
-        KingGame.flag_taken_by = None
-        KingGame.flag_taken_at = 0
-        KingGame.leftscore = 0
-        KingGame.rightscore = 0
-        KingGame.lefttime = 0
-        KingGame.righttime = 0
+        logger.info('Resetting KOTH game')
+        KOTH.flag_timer_thread = None
+        KOTH.flag_timer_event = Event()
+        KOTH.flag_taken_by = None
+        KOTH.flag_taken_at = 0
+        KOTH.leftscore = 0
+        KOTH.rightscore = 0
+        KOTH.lefttime = 0
+        KOTH.righttime = 0
         server.overrideBallScore(0, 0)
 
 
     def flag_timer(self, server, player, event):
+        logger.info('Flag timer started')
         t = 0
         WAIT = 1
         while True:
@@ -62,7 +68,7 @@ class KingGame(module.MapModule):
                 #It doesn't exist yet
                 #player.flag_hold_time += t
                 
-                #Also need to set the KingGame.lefttime and righttime
+                #Also need to set the KOTH.lefttime and righttime
                 #so we can score off of partial holds, instead of
                 # waiting for complete minutes
                 break
@@ -80,9 +86,12 @@ class KingGame(module.MapModule):
                 left = 1 if player.team == server.map.leftTeam else 0
                 right = 1 if player.team == server.map.rightTeam else 0
                 
-                KingGame.leftscore += left
-                KingGame.rightscore += right
-                server.overrideBallScore(KingGame.leftscore, KingGame.rightscore)
+                KOTH.leftscore += left
+                KOTH.rightscore += right
+                server.overrideBallScore(KOTH.leftscore, KOTH.rightscore)
+ 
+                logger.info('The %s team scored.  Score: %s %s' % (team_color, KOTH.leftscore, KOTH.rightscore))
+
             elif t == 30:
                 server.serverMessage('30 seconds remaining...  Get to work %s.' % other_team)
             elif t == 40:
@@ -112,26 +121,11 @@ class KingGame(module.MapModule):
             time.sleep(WAIT)
             t +=1
 
-        print('Thread ending...')
-
+        logger.info('Flag timer ended')
 
     #################
     # Events
     #################
-
-    def roundEnd(self, event, _, thread_lock):
-        events.Events.roundEnd(self, event, _, thread_lock)
-
-        server = self.servers[event['port']]
-        if server.map.name != self.map_name: return
-        
-        with thread_lock:
-            KingGame.flag_timer_event.set()
-            time.sleep(2)
-            pass # <--- ???
-            time.sleep(18)
-            self.reset(server)
-
 
     def mapChange(self, event, _, thread_lock):
         # NOTE
@@ -147,7 +141,7 @@ class KingGame(module.MapModule):
         server = self.servers[event['port']]
         if server.port == 27282:
             with thread_lock:
-                KingGame.flag_timer_event.set()
+                KOTH.flag_timer_event.set()
                 time.sleep(2)
                 self.reset(server)
 
@@ -158,15 +152,13 @@ class KingGame(module.MapModule):
         server = self.servers[event['port']]
         if server.map.name != self.map_name: return
         if event['powerup'] != 'Health' or (event['positionX'], event['positionY']) != (1501, 1735): return
-
         
         player = server.get_player_by_number(event['player'])
         if not player: return
-
         
         with thread_lock:
-            if not KingGame.flag_taken_by or KingGame.flag_taken_by.team != player.team:
-                if KingGame.flag_timer_thread:
+            if not KOTH.flag_taken_by or KOTH.flag_taken_by.team != player.team:
+                if KOTH.flag_timer_thread:
                     #flag was taken back by the other team
                     #print out how long it was held for and store it
                     #server.serverMessage()
@@ -175,10 +167,11 @@ class KingGame(module.MapModule):
                 team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
                 other_color = 'orange' if team_color == 'blue' else 'blue'
                 server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
-                
-                KingGame.flag_taken_by = player
-                KingGame.flag_taken_at = event['time']
-                KingGame.flag_timer_event = Event()
-                KingGame.flag_timer_thread = Thread(target=self.flag_timer, args=(server, player, KingGame.flag_timer_event), daemon=True)
-                KingGame.flag_timer_thread.start() 
+                logger.info('%s took the flag for the %s team' % (player.nickname, team_color))
+
+                KOTH.flag_taken_by = player
+                KOTH.flag_taken_at = event['time']
+                KOTH.flag_timer_event = Event()
+                KOTH.flag_timer_thread = Thread(target=self.flag_timer, args=(server, player, KOTH.flag_timer_event), daemon=True)
+                KOTH.flag_timer_thread.start() 
 

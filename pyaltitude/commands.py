@@ -1,6 +1,8 @@
 #!/usr/bin/env python3.7
 
-import subprocess
+import subprocess, logging
+
+logger = logging.getLogger(__name__)
 
 class Commands(object):
 
@@ -17,7 +19,8 @@ class Commands(object):
             this_cmd += ' '+str(arg)
 
         cmd = '/bin/echo "%s" >> %s' % (this_cmd, self.command_path)
-        subprocess.run(cmd, shell=True)#,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+        logger.debug('Executing "%s"' % cmd)
+        subprocess.run(cmd, shell=True)
 
     def listPlayers(self):
         self._send('listPlayers')

@@ -2,13 +2,10 @@ import re
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
-from aiologger import Logger
-
 
 class Base(object):
-    logger = Logger.with_default_handlers(name='pyaltitude.Base')
 
-    re_int= re.compile(r'^-?\d+$')
+    re_int = re.compile(r'^-?\d+$')
     re_float = re.compile(r'^-?\d+\.?\d*$')
 
     """

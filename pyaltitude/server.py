@@ -1,23 +1,20 @@
 import uuid, time
-import aiofiles
+import subprocess, logging
+from collections import namedtuple
 from threading import Thread, Event
-
-import subprocess
 
 from . import base
 from . import commands
 
-from aiologger import Logger
 
 COMMAND_PATH = '/home/sean/altitude/servers/command.txt'
 
-class MockMap(object):
-    def __init__(self):
-        self.state = None
-        self.name = None
+
+MockMap = namedtuple('MockMap', ('state', 'name'), defaults = (None, None))
+
+logger = logging.getLogger(__name__)
 
 class Server(base.Base, commands.Commands):
-    logger = Logger.with_default_handlers(name='pyaltitude.Server')
 
     def __init__(self):
         # check if player is admin when logging in, then set is_admin
@@ -48,26 +45,21 @@ class Server(base.Base, commands.Commands):
     # Load and Unload module methods have to be on the worker threads since
     # they executre in their own environment
     # I'm 90% sure
-    #def set_map(self, map):
-    #    #TODO I don't believe we need this method
-    #    print('Setting map on server %s to %s' % (self.serverName, map.name))
-    #    self.map = map
 
     def add_player(self, player, message=True):
-        print('Adding player %s to server %s' % (player.nickname, self.serverName))
+        logger.info('Adding player %s to server %s' % (player.nickname, self.serverName))
         self.players.append(player)
         self.players_changed(player, True, message=message)
-        #print(player.describe())
+        #logger.debug(player.describe())
 
     def remove_player(self, player, message=True):
-        print('Removing player %s from server %s' % (player.nickname, self.serverName))
+        logger.info('Removing player %s from server %s' % (player.nickname, self.serverName))
         self.players.remove(player)
         self.players_changed(player, False, message=message)
 
     def players_changed(self, player, added, message=True):
         if not player.is_bot():
             if added:
-                print("%s joined server %s" % (player.nickname, self.serverName))
                 player.whisper('Hey %s!' % player.nickname)
                 player.whisper('Welcome to %s!' % self.serverName)
 
@@ -78,7 +70,7 @@ class Server(base.Base, commands.Commands):
             # only log plane positions on King of the Hill
             if self.port == 27282 and player_count == 1 and not self.log_planes_thread:
                 #when the first player enters the arena, start the log planes thread
-                print('Starting log plane thread on %s' % self.serverName)
+                logger.info('Starting log plane thread on %s' % self.serverName)
                 self.log_planes_thread = Thread(target=self.log_planes, args=(self.log_planes_event, ),daemon=True)
                 self.log_planes_thread.start()
     
@@ -87,7 +79,7 @@ class Server(base.Base, commands.Commands):
             #
             elif self.port == 27282 and player_count == 0:
                 # last player leaves, stop it
-                print('Stopping log plane thread on %s' % self.serverName)
+                logger.info('Stopping log plane thread on %s' % self.serverName)
                 self.log_planes_event.set()
                 time.sleep(1)
                 self.log_planes_thread = None
@@ -95,11 +87,10 @@ class Server(base.Base, commands.Commands):
 
             if message:
                 self.serverMessage('%s players now in server' % player_count)
-            print([p.nickname for p in self.get_players()])
+            logger.info("Players now in %s: %s" % (self.serverName, [p.nickname for p in self.get_players()]))
 
 
     def map_player_positions(self, event):
-        #{"positionByPlayer":{"0":"776,726","1":"3028,683","2":"704,784","3":"3043,799","4":"652,733","5":"3095,748","6":"-1,-1"},"port":27278,"time":46699,"type":"logPlanePositions"}
         for pid, coords in event['positionByPlayer'].items():
             player = self.get_player_by_number(int(pid), bots=False)
             if not player:
@@ -128,11 +119,6 @@ class Server(base.Base, commands.Commands):
         for p in self.get_players():
             if p.vaporId == uuid.UUID(vaporId):
                 return p
-        #try:
-        #    return next((p for p in self.players if p.vaporId == uuid.UUID(vaporId)))
-        #except StopIteration:
-        #    #slow, but don't think this raised often.  Only on startup
-        #    return None
 
     def get_player_by_number(self, number, bots=True):
         for p in self.get_players(bots=bots):
@@ -141,6 +127,9 @@ class Server(base.Base, commands.Commands):
             if p.player == number:
                 return p
 
+            # TODO if we don't have a match, return a MockPlayer
+            # so we don't have to do `if player:` everywhere
+            
     def get_player_by_name(self, name):
         for p in self.get_players():
             if p.nickname == name:
@@ -149,6 +138,7 @@ class Server(base.Base, commands.Commands):
     def parse(self, attrs):
         #convert_types since we are reading from the xml file
         super().parse(attrs, convert_types=True)
+        logger.info('Initialilzed server: %s on port %s' % (self.serverName, self.port))
         commands.Commands.__init__(self)
         return self
  

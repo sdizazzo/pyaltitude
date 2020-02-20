@@ -1,21 +1,19 @@
 #!/usr/bin/env python3.7
 
 import os
-import asyncio
-import aiofiles
-import ujson
-import xml.etree.ElementTree as ET
-import concurrent.futures
 import queue
 import time
 import logging
-import traceback
-from threading import Lock
+import threading
+
+from logging.handlers import RotatingFileHandler
 from functools import partial
 
-from aiologger import Logger
-logging.basicConfig(level=logging.DEBUG)
-import threading
+import xml.etree.ElementTree as ET
+import concurrent.futures
+
+import ujson # faster than built-in but we have small data
+             # not sure it justifies a requirement
 
 #TODO config module
 # paths are currently hardcoded in individual mods
@@ -36,8 +34,12 @@ from pyaltitude.modules import *
 
 
 
+logger = logging.getLogger('pyaltitude')
+
+
+
 class Worker(Events):
-    logger = Logger.with_default_handlers(name='pyaltitude.Worker')
+    logger = logging.getLogger('pyaltitude.Worker')
 
     def __init__(self, line, init, servers, thread_lock):
         self.line = line
@@ -45,7 +47,11 @@ class Worker(Events):
         self.servers = servers
         self.thread_lock = thread_lock
 
+
     def execute(self):
+        #I don't believe its worth the overhead of setting up a logger here
+        # just to get the thread number executing
+        #self.logger = logging.getLogger('pyaltitude.%s' % threading.current_thread().name)
         def get_module_events(module):
             events = list()
             for func in dir(module):
@@ -56,13 +62,12 @@ class Worker(Events):
 
         #####
         #NOTE HACK!!!!!!!!!!!!!!!!!!!!!!!!
-        #testing attaching the module dynamically
 
         # NEED LOAD MODULE AND UNLOAD MODULES BASED ON GAME MODE OR MAP OR
         # SERVER
         # 
         # Will do for all (server?) modules
-        mods = (king_game.KingGame, )
+        mods = (king_of_the_hill.KOTH, )
         for module in mods:
             module.servers = self.servers
             for func_name in get_module_events(module()):
@@ -72,10 +77,11 @@ class Worker(Events):
         try:
             event = ujson.loads(self.line)
         except ValueError:
-            print("ERROR: Worker could not parse log line: %s" % self.line)
+            self.logger.error("Worker could not parse log line: %s" % self.line)
             raise
 
-        try:            
+        try:
+            self.logger.debug("Processing event %s" % event)
             method = getattr(self, event['type'])
         except AttributeError as e:
             #print(e)
@@ -89,13 +95,32 @@ class Worker(Events):
 
 
 class Main(object):
-    logger = Logger.with_default_handlers(name='pyaltitude.Main')
-    
 
-    def run(self):
+    def setup_logging(self, logfile, debug):
+        formatter = logging.Formatter('%(asctime)s - %(name)35s - %(levelname)10s - %(message)s')
+
+        if debug:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
+
+        sh = logging.StreamHandler()
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
+
+        if logfile:
+            fh = RotatingFileHandler(filename=logfile, maxBytes=5*1024*1024, backupCount=10)
+            fh.setFormatter(formatter)
+            logger.addHandler(fh)
+            logger.info("Logging to file at %s" % logfile)
+
+
+    def run(self, logfile=None, debug=False):
+        self.setup_logging(logfile, debug)
+
         self.servers = self.parse_server_config()
         self.queue = queue.Queue()
-        self.thread_lock = Lock()
+        self.thread_lock = threading.Lock()
 
         ##################
         # NOTE
@@ -109,10 +134,10 @@ class Main(object):
         tail_thread.start()
 
 
-        with concurrent.futures.ThreadPoolExecutor(min(32, os.cpu_count() + 4), thread_name_prefix='Worker-') as pool:
+        with concurrent.futures.ThreadPoolExecutor(min(32, os.cpu_count() + 4), thread_name_prefix='Worker') as pool:
             # one NOTE is that I dont want to have to load modules
             # on every event worry about that later
-            
+            logger.info('Initialized thread pool')
             while True:
                 try:
                     (line, INIT) = self.queue.get()
@@ -122,23 +147,24 @@ class Main(object):
                     future.add_done_callback(self.worker_done_cb)
                     time.sleep(.01)
                 except KeyboardInterrupt:
-                    #when hitting Ctrl-C
+                    logger.info('Done.')
                     break
 
 
     def worker_done_cb(self, fut):
         exception = fut.exception()
         if exception:
-            print('Worker exception (callback): %s' % repr(exception))
             try:
-                #get the result so we raise the exception
+                # get the result so we raise the exception
                 # and get the traceback
                 fut.result()
             except Exception as e:
-                print(traceback.format_exc())
+                logger.exception('Worker raised exception: %s' % repr(e))
 
 
     def tail(self):
+        logger.info('Begin tailing log file at %s' % PATH)
+
         #seek to end of file and begin tailing
         with open(PATH, 'rt') as f:
             f.seek(0, 2)
@@ -152,6 +178,8 @@ class Main(object):
 
     def parse_server_config(self):
         servers = dict()
+
+        logger.info('Parsing server config file at: %s' % LAUNCHER_CONFIG)
         with open(LAUNCHER_CONFIG, 'rt') as f:
             contents = f.read()
 
@@ -159,7 +187,6 @@ class Main(object):
         for server_config in root.iter("AltitudeServerConfig"):
             server = Server()
             server = server.parse(server_config.attrib)
-            #attrs = server.describe()
             servers[server.port] = server
 
         mapList = root.find('mapList')
@@ -167,5 +194,9 @@ class Main(object):
  
 
 if __name__ == "__main__":
-    #asyncio.run(Main().run())#, debug=True)
-    Main().run()
+    
+    from datetime import datetime
+    
+    Main().run(logfile='./PYALTITUDE_%s.log' % datetime.now(), debug=True)
+
+

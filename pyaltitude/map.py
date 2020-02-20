@@ -1,20 +1,19 @@
 import os
 import struct
 import lzma
+import logging
+import xml.etree.ElementTree as ET
 
 from . import base
 from . import enums
-from aiologger import Logger
-import xml.etree.ElementTree as ET
-
 
 
 map_dir = "/home/sean/altitude/maps"
 
-
+logger = logging.getLogger(__name__)
 
 class SpawnPoint(base.Base):
-    logger = Logger.with_default_handlers(name='pyaltitude.SpawnPoint')
+    logger = logging.getLogger('pyaltitude.SpawnPoint')
 
     def __init__(self):
         self.team = None
@@ -23,6 +22,7 @@ class SpawnPoint(base.Base):
     #it's not really json...
     def parse(self, json):
         self._json = json
+        logger.debug("Initialized SpawnPoint")
         super().parse(json, convert_types=True)
 
         return self
@@ -30,7 +30,7 @@ class SpawnPoint(base.Base):
 
 
 class Map(base.Base):
-    logger = Logger.with_default_handlers(name='pyaltitude.Map')
+    logger = logging.getLogger('pyaltitude.Map')
 
     def __init__(self, server, name):
         self.server = server
@@ -60,6 +60,7 @@ class Map(base.Base):
         #
         #just grab the spawnPoints so far...
         #
+        logger.debug("Parsing map xml")
         root = ET.fromstring(self.raw_xml)
         for xspawn in root.iter("spawnPoints"):
             if not xspawn.attrib: continue
@@ -79,6 +80,7 @@ class Map(base.Base):
             Thanks to Biell for his documentaion of the map archive format.
             https://github.com/biell/alti-server/blob/78b1a60e05c2f5e3e674acefd88a0f574a8f83c1/altx-tool#L166
         """
+        logger.debug('Extracting map xml from .altx file: %s' %  self.path)
         with lzma.open(self.path, 'rb') as fi:
             count = struct.unpack('<i', fi.read(4))[0]
             
@@ -100,9 +102,9 @@ class Map(base.Base):
     def parse(self, json):
         self._json = json
         super().parse(json)
-
         self.name = self.map
         self.game_start = self.time
+        logger.info("Loaded map %s on %s" % (self.name, self.server.serverName))
         return self
 
 if __name__ == "__main__":

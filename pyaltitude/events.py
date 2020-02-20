@@ -1,13 +1,13 @@
 import time
-
-from aiologger import Logger
+import logging
 
 from pyaltitude.player import Player
 from pyaltitude.map import Map
 from pyaltitude.enums import MapState
 
+logger = logging.getLogger(__name__)
+
 class Events(object):
-    logger = Logger.with_default_handlers(name='pyaltitude.Events')
 
     def clientAdd(self, event, INIT, thread_lock):
         server = self.servers[event['port']]
@@ -28,6 +28,7 @@ class Events(object):
         if player:
             server.remove_player(player, message =not INIT)
 
+
     def spawn(self, event, _, thread_lock):
         server = self.servers[event['port']]
         #{'plane': 'Biplane', 'port': 27280, 'perkGreen': 'Heavy Armor',
@@ -44,7 +45,6 @@ class Events(object):
 
     def mapLoading(self, event, _, thread_lock):
         server = self.servers[event['port']]
-        print("MapLoading: %s" % event)
         #{'port': 27279, 'time': 16501201, 'type': 'mapLoading', 'map':'ffa_core'}
         # THis event gives us the map name which is enough to
         # instatiate the map object and begin parsing the map 
@@ -59,7 +59,8 @@ class Events(object):
     def serverHitch(self, event, _, thread_lock):
         #{"duration":631.8807983398438,"port":27278,"time":3367621,"type":"serverHitch","changedMap":false}
         server = self.servers[event['port']]
-
+        server.serverMessage('ServerHitch: %.2f' % event['duration'])
+        logger.warning('ServerHitch: %.2f, %s' % (event['duration'], server.serverName))
 
     def roundEnd(self, event, _, thread_lock):
         pass
@@ -72,16 +73,15 @@ class Events(object):
     def mapChange(self, event, _, thread_lock):
         server = self.servers[event['port']]
         #{"mode":"ball","rightTeam":5,"port":27278,"leftTeam":6,"time":5808529,"type":"mapChange","map":"ball_cave"}
-        print("MapChange: %s" % event)
 
         wait = .5
         t = 0
         while not server.map.state == MapState.READY:
             time.sleep(wait)
-            print('WARNING!!!! sleeping waiting for map to become available: %s' % server.map.name)
+            logger.warning('mapChange: Sleeping waiting for map to become available: %s' % server.map.name)
             t+=wait
             if t >= 2:
-                print('WARNING!!!!!! Took over 2 seconds to parse map.  Continued anyway...')
+                logger.warning('mapChange: Took over 2 seconds to parse map.  Continued anyway...')
                 break
 
         server.map.parse(event)
@@ -136,6 +136,8 @@ class Events(object):
         server.overrideSpawnPoint(from_player.nickname, to_player.x, to_player.y, 0)
         server.assignTeam(from_player.nickname, 0 if from_player.team == server.map.leftTeam else 1)
         from_player.attached = True
+        logger.info('%s attached to %s' % (from_player.nickname, to_player.nickname))
+
 
     def consoleCommandExecute(self, event, _, thread_lock):
         server = self.servers[event['port']]

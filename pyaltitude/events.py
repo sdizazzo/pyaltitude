@@ -18,15 +18,10 @@ class Events(object):
 
     def clientRemove(self, event, INIT, thread_lock):
         server = self.servers[event['port']]
-        #NOTE 
-        # BUG player is None sometimes here and I dont understand why yet
-        #Its a race condition.  Not sure if it matters or not yet
-        # seems not to so I'll leave it as is for now and worry later
 
         # see https://github.com/sdizazzo/pyaltitude/issues/4
         player = server.get_player_by_vaporId(event['vaporId'])
-        if player:
-            server.remove_player(player, message =not INIT)
+        server.remove_player(player, event['reason'], event['message'], message =not INIT)
 
 
     def spawn(self, event, _, thread_lock):
@@ -35,8 +30,7 @@ class Events(object):
         #'perkRed': 'Heavy Cannon', 'skin': 'No Skin', 'team': 4, 'time':
         #18018150, 'type': 'spawn', 'perkBlue': 'Ultracapacitor', 'player': 2}
         player = server.get_player_by_number(event['player'])
-        if player:
-            player.spawned()
+        player.spawned()
 
     def logPlanePositions(self, event, _, thread_lock):
         server = self.servers[event['port']]
@@ -90,24 +84,16 @@ class Events(object):
 
     def playerInfoEv(self, event, _, thread_lock):
         server = self.servers[event['port']]
-        #    #{"plane":"Loopy","level":1,"port":27278,"perkGreen":"No Green Perk","perkRed":"Tracker","team":2,"time":5808868,"type":"playerInfoEv","leaving":false,"perkBlue":"No Blue Perk","aceRank":0,"player":1}
-        #print("playerInfoEv: %s" % event)
-        player = server.get_player_by_number(event['player'])
+        if event['leaving']: return             #<-----  That was all I needed for my player tracking problems!
 
-        #Events can come after a player has already been removed from the server object
-        # ANything that queries for the player_by_number can return None
-        # OR EVEN the wrong player perhaps
-        if player:
-            player.parse_playerInfoEv(event)
+        player = server.get_player_by_number(event['player'])
+        player.parse_playerInfoEv(event)
 
 
     def teamChange(self, event, _, thread_lock):
         server = self.servers[event['port']]
-        #{"port":27278,"team":2,"time":5808868,"type":"teamChange","player":0}
         player = server.get_player_by_number(event['player'])
-        #print("Set team: %s" % event)
-        if player:
-            player.set_team(event['team'])
+        player.team = event['team']
 
 
     def attach(self, server, from_player, to_player):

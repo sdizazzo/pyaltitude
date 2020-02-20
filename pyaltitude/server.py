@@ -52,8 +52,8 @@ class Server(base.Base, commands.Commands):
         self.players_changed(player, True, message=message)
         #logger.debug(player.describe())
 
-    def remove_player(self, player, message=True):
-        logger.info('Removing player %s from server %s' % (player.nickname, self.serverName))
+    def remove_player(self, player, reason, explain, message=True):
+        logger.info('Removing player %s from server %s, Reason: %s, Explain: %s' % (player.nickname, self.serverName, reason, explain))
         self.players.remove(player)
         self.players_changed(player, False, message=message)
 
@@ -93,10 +93,10 @@ class Server(base.Base, commands.Commands):
     def map_player_positions(self, event):
         for pid, coords in event['positionByPlayer'].items():
             player = self.get_player_by_number(int(pid), bots=False)
-            if not player:
-                continue
-            x, y = coords.split(',')
-            player.x, player.y = (int(x), int(y))
+            #if not player:
+            #    continue
+            x, y, angle = coords.split(',')
+            player.x, player.y, player.angle = (int(x), int(y), int(angle))
 
     def get_players(self, bots=False):
         pl = list()
@@ -127,8 +127,6 @@ class Server(base.Base, commands.Commands):
             if p.player == number:
                 return p
 
-            # TODO if we don't have a match, return a MockPlayer
-            # so we don't have to do `if player:` everywhere
             
     def get_player_by_name(self, name):
         for p in self.get_players():

@@ -14,6 +14,7 @@ class Player(base.Base):
         self.server = server
         self.x = -1
         self.y = -1
+        self.angle = -1
         self.team = None
         self.attached = False
         self.last_attached_player = None
@@ -35,11 +36,6 @@ class Player(base.Base):
             if not k in ('port', 'type', 'player'):
                 setattr(self, k, v)
 
-    def set_team(self, team):
-        # Is this method even needed?
-        # I don't believe so.
-        self.team = team
-
     def whisper(self, message):
         self.server.serverWhisper(self.nickname, message)
 
@@ -55,7 +51,7 @@ class Player(base.Base):
         self.attached = False
 
     def is_alive(self):
-        if self.team == 2 or (self.x, self.y) == (-1, -1):
+        if self.team == 2 or (self.x, self.y, self.angle) == (-1, -1, -1):
             return False
         else:
             return True

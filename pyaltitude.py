@@ -84,10 +84,7 @@ class Worker(Events):
             self.logger.debug("Processing event %s" % event)
             method = getattr(self, event['type'])
         except AttributeError as e:
-            #print(e)
-            #
-            #NOT IMPLEMENTED!!!!!
-            #
+            #self.logger.warning(repr(NotImplementedError(event['type'])))
             return
         
         method(event, self.init, self.thread_lock)
@@ -107,6 +104,8 @@ class Main(object):
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
         logger.addHandler(sh)
+
+        logger.info("Starting up.")
 
         if logfile:
             fh = RotatingFileHandler(filename=logfile, maxBytes=5*1024*1024, backupCount=10)
@@ -141,7 +140,6 @@ class Main(object):
             while True:
                 try:
                     (line, INIT) = self.queue.get()
-                    #print('Submitting Worker for line: %s' % line.strip())
                     worker = Worker(line, INIT, self.servers, self.thread_lock)
                     future = pool.submit(worker.execute)
                     future.add_done_callback(self.worker_done_cb)

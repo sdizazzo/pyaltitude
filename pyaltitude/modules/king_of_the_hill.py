@@ -6,7 +6,9 @@ from . import module
 from .. import map
 from .. import events
 
+
 logger = logging.getLogger(__name__)
+
 
 class KOTH(module.MapModule):
 
@@ -25,7 +27,8 @@ class KOTH(module.MapModule):
         # CANT USE INSTANCE VARIABLES!!!!!
         # BECAUSE EACH WORKER WOULD GET A DIFFERNT
         # COPY!!!!!!!!!!! 
-        
+        # USE CLASS VARIABLES ABOVE INSTEAD!!!!
+
         # Also dont forget that whenever updating a
         # class variable, you must do it within the
         # context of the thread lock ie.
@@ -37,8 +40,6 @@ class KOTH(module.MapModule):
         # in the events, which are executed in the worker threads
         # if modified in the main class, you shouldn't need
         # to use the thread_lock
-
-        #USE CLASS VARIABLES ABOVE INSTEAD!!!!
 
         super().__init__(self, map)
 
@@ -152,16 +153,19 @@ class KOTH(module.MapModule):
         server = self.servers[event['port']]
         if server.map.name != self.map_name: return
         if event['powerup'] != 'Health' or (event['positionX'], event['positionY']) != (1501, 1735): return
-        
+        #THis is the right powerup
         player = server.get_player_by_number(event['player'])
-        if not player: return
+        #if not player: return
         
         with thread_lock:
             if not KOTH.flag_taken_by or KOTH.flag_taken_by.team != player.team:
+                #its an event we need to pay attention to
                 if KOTH.flag_timer_thread:
                     #flag was taken back by the other team
                     #print out how long it was held for and store it
                     #server.serverMessage()
+                    
+                    #stop the last timer
                     self.flag_timer_event.set()
 
                 team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
@@ -172,6 +176,7 @@ class KOTH(module.MapModule):
                 KOTH.flag_taken_by = player
                 KOTH.flag_taken_at = event['time']
                 KOTH.flag_timer_event = Event()
+                #start a new timer for this player
                 KOTH.flag_timer_thread = Thread(target=self.flag_timer, args=(server, player, KOTH.flag_timer_event), daemon=True)
                 KOTH.flag_timer_thread.start() 
 

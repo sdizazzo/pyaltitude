@@ -128,7 +128,6 @@ class Main(object):
         # also determine which modules to load 
         # and pass in through to workers
 
-        
         tail_thread=threading.Thread(target=self.tail, daemon=True)
         tail_thread.start()
 
@@ -160,18 +159,24 @@ class Main(object):
                 logger.exception('Worker raised exception: %s' % repr(e))
 
 
-    def tail(self):
-        logger.info('Begin tailing log file at %s' % PATH)
+    def tail(self, rollover=False):
+        if rollover:
+            logger.info("Tailing log file after rollover at %s" % PATH)
+        else:
+            logger.info('Begin tailing log file at %s' % PATH)
 
-        #seek to end of file and begin tailing
         with open(PATH, 'rt') as f:
-            f.seek(0, 2)
+            inode = os.fstat(f.fileno()).st_ino
             while True:
                 line = f.readline()
                 if not line:
+                    if os.stat(PATH).st_ino != inode:
+                        break
                     time.sleep(0.01)
                     continue
                 self.queue.put((line, False))
+
+        self.tail(rollover=True)
 
 
     def parse_server_config(self):
@@ -195,6 +200,6 @@ if __name__ == "__main__":
     
     from datetime import datetime
     
-    Main().run(logfile='./PYALTITUDE_%s.log' % datetime.now(), debug=True)
+    Main().run(logfile='./PYALTITUDE_%s.log' % datetime.now(), debug=False)
 
 

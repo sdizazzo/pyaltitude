@@ -61,7 +61,7 @@ class KOTH(module.MapModule):
 
 
     def flag_timer(self, server, player, event):
-        logger.info('Flag timer started')
+        logger.debug('Flag timer started')
         t = 0
         WAIT = 1
         while True:
@@ -122,7 +122,7 @@ class KOTH(module.MapModule):
             time.sleep(WAIT)
             t +=1
 
-        logger.info('Flag timer ended')
+        logger.debug('Flag timer ended')
 
     #################
     # Events

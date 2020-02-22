@@ -15,6 +15,8 @@ class Player(base.Base):
         self.x = -1
         self.y = -1
         self.angle = -1
+        self.velocity = -1
+        self.time = 0
         self.team = None
         self.attached = False
         self.last_attached_player = None

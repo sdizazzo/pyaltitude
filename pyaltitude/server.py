@@ -1,4 +1,5 @@
 import uuid, time
+import math
 import subprocess, logging
 from collections import namedtuple
 from threading import Thread, Event
@@ -39,18 +40,15 @@ class Server(base.Base, commands.Commands):
             if event.is_set():
                 break
             subprocess.run(cmd, shell=True)
-            time.sleep(.2)
+            time.sleep(.1)
 
-    # NOTE
-    # Load and Unload module methods have to be on the worker threads since
-    # they executre in their own environment
-    # I'm 90% sure
 
     def add_player(self, player, message=True):
         logger.info('Adding player %s to server %s' % (player.nickname, self.serverName))
         self.players.append(player)
         self.players_changed(player, True, message=message)
         #logger.debug(player.describe())
+
 
     def remove_player(self, player, reason, explain, message=True):
         logger.info('Removing player %s from server %s, Reason: %s, Explain: %s' % (player.nickname, self.serverName, reason, explain))
@@ -89,14 +87,32 @@ class Server(base.Base, commands.Commands):
                 self.serverMessage('%s players now in server' % player_count)
             logger.info("Players now in %s: %s" % (self.serverName, [p.nickname for p in self.get_players()]))
 
+    #will go into some kind of utils or math module
+    def calc_distance(self, x1, y1, x2, y2):
+        return math.sqrt((x2 - x1)**2 + (y2 - y1)**2) 
 
     def map_player_positions(self, event):
+        now = event['time']
+
+        #
+        # Now that we are doing some actual calculations and things that could
+        # throw errors it would be much better to break this up per player and 
+        # execute this on the worker threads.  Not sure how feasible that is 
+        # since it's not an event.
+        #
         for pid, coords in event['positionByPlayer'].items():
             player = self.get_player_by_number(int(pid), bots=False)
-            #if not player:
-            #    continue
             x, y, angle = coords.split(',')
-            player.x, player.y, player.angle = (int(x), int(y), int(angle))
+
+            # calculate a simple velocity
+            if player.is_alive() and all((player.x, player.y, player.angle, player.time)):
+                distance = self.calc_distance(player.x, int(x), player.y, int(y))
+                elapsed = now - player.time
+                player.velocity = distance/elapsed
+                logger.debug("Set player velocity: %s" % player.velocity)
+
+            player.x, player.y, player.angle, player.time = (int(x), int(y), int(angle), now)
+
 
     def get_players(self, bots=False):
         pl = list()
@@ -105,6 +121,7 @@ class Server(base.Base, commands.Commands):
                 continue
             pl.append(p)
         return pl
+
 
     def get_players_by_team(self):
         teams = dict(leftTeam=list(), rightTeam=list())
@@ -115,10 +132,12 @@ class Server(base.Base, commands.Commands):
                 teams['rightTeam'].append(p)
         return teams
 
+
     def get_player_by_vaporId(self, vaporId):
         for p in self.get_players():
             if p.vaporId == uuid.UUID(vaporId):
                 return p
+
 
     def get_player_by_number(self, number, bots=True):
         for p in self.get_players(bots=bots):
@@ -132,6 +151,7 @@ class Server(base.Base, commands.Commands):
         for p in self.get_players():
             if p.nickname == name:
                 return p
+
 
     def parse(self, attrs):
         #convert_types since we are reading from the xml file

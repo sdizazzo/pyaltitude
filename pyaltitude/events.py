@@ -1,13 +1,36 @@
 import time
 import logging
+from datetime import datetime, timezone, timedelta, tzinfo
 
 from pyaltitude.player import Player
 from pyaltitude.map import Map
 from pyaltitude.enums import MapState
 
+
 logger = logging.getLogger(__name__)
 
+
+#this does not belong here
+class EST(tzinfo):
+    def utcoffset(self, dt):
+        return timedelta(hours=-5)
+    def tzname(self, dt):
+        return "EST"
+    def dst(self, dt):
+        return timedelta(hours=-5)
+
+
 class Events(object):
+
+    def sessionStart(self, event, INIT, thread_lock):
+        #{'date': '2020 Feb 22 04:01:43:847 EST', 'port': -1, 'time': 0,'type': 'sessionStart'}
+        date_str = event['date'][:-8]
+        date = datetime.strptime(date_str, "%Y %b %d %H:%M:%S").replace(tzinfo=EST())
+        logger.info("Session officially starts at (Nimbly time): %s" % date)
+        for server in self.servers.values():
+            server.start = date
+            server.time = 0
+
 
     def clientAdd(self, event, INIT, thread_lock):
         server = self.servers[event['port']]

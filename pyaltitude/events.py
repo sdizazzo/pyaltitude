@@ -55,6 +55,7 @@ class Events(object):
         player = server.get_player_by_number(event['player'])
         player.spawned()
 
+
     def logPlanePositions(self, event, _, thread_lock):
         server = self.servers[event['port']]
         server.map_player_positions(event)
@@ -79,11 +80,20 @@ class Events(object):
         server.serverMessage('ServerHitch: %.2f' % event['duration'])
         logger.warning('ServerHitch: %.2f, %s' % (event['duration'], server.serverName))
 
+
     def roundEnd(self, event, _, thread_lock):
         pass
 
 
+    def powerupUse(self, event, _, thread_lock):
+        pass
+
+
     def powerupAutoUse(self, event, _, thread_lock):
+        pass
+
+
+    def powerupPickup(self, event, _, thread_lock):
         pass
 
 

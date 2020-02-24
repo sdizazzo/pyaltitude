@@ -47,7 +47,7 @@ class Player(base.Base):
     def spawned(self):
         #reset our spawn point after a call to /attach
         if self.attached:
-            time.sleep(.5) # where does this sleep run????  in a thread only is
+            time.sleep(.2) # where does this sleep run????  in a thread only is
                            # acceptable...yes Worker()
             self.server.overrideSpawnPoint(self.nickname, 0, 0, 0)
         self.attached = False

@@ -66,7 +66,7 @@ class Server(base.Base, commands.Commands):
             #TODO HACK!!!
             #
             # only log plane positions on King of the Hill
-            if self.port == 27282 and player_count == 1 and not self.log_planes_thread:
+            if self.port in (27282, 27283) and player_count == 1 and not self.log_planes_thread:
                 #when the first player enters the arena, start the log planes thread
                 logger.info('Starting log plane thread on %s' % self.serverName)
                 self.log_planes_thread = Thread(target=self.log_planes, args=(self.log_planes_event, ),daemon=True)
@@ -75,7 +75,7 @@ class Server(base.Base, commands.Commands):
             #
             # TODO HACK!!!!
             #
-            elif self.port == 27282 and player_count == 0:
+            elif self.port in (27282, 27283) and player_count == 0:
                 # last player leaves, stop it
                 logger.info('Stopping log plane thread on %s' % self.serverName)
                 self.log_planes_event.set()
@@ -87,9 +87,11 @@ class Server(base.Base, commands.Commands):
                 self.serverMessage('%s players now in server' % player_count)
             logger.info("Players now in %s: %s" % (self.serverName, [p.nickname for p in self.get_players()]))
 
+
     #will go into some kind of utils or math module
     def calc_distance(self, x1, y1, x2, y2):
         return math.sqrt((x2 - x1)**2 + (y2 - y1)**2) 
+
 
     def map_player_positions(self, event):
         now = event['time']
@@ -101,13 +103,16 @@ class Server(base.Base, commands.Commands):
         # since it's not an event.
         #
         for pid, coords in event['positionByPlayer'].items():
-            player = self.get_player_by_number(int(pid), bots=False)
+            player = self.get_player_by_number(int(pid), bots=True)
             x, y, angle = coords.split(',')
 
             # calculate a simple velocity
             if player.is_alive() and all((player.x, player.y, player.angle, player.time)):
                 distance = self.calc_distance(player.x, int(x), player.y, int(y))
                 elapsed = now - player.time
+                # hmmmm....
+                # got a ZeroDivisionError here
+                # not convinced yet. Its late.
                 player.velocity = distance/elapsed
                 logger.debug("Set player velocity: %s" % player.velocity)
 

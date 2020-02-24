@@ -67,7 +67,7 @@ class Worker(Events):
         # SERVER
         # 
         # Will do for all (server?) modules
-        mods = (king_of_the_hill.KOTH, )
+        mods = (king_of_the_hill.KOTH, speedy.SpeedyModule)
         for module in mods:
             module.servers = self.servers
             for func_name in get_module_events(module()):

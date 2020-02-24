@@ -31,6 +31,9 @@ class Events(object):
             server.start = date
             server.time = 0
 
+    def serverInit(self, event, _, thread_lock):
+        pass
+
 
     def clientAdd(self, event, INIT, thread_lock):
         server = self.servers[event['port']]

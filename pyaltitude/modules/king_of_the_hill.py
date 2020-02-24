@@ -128,6 +128,34 @@ class KOTH(module.MapModule):
     # Events
     #################
 
+    def serverInit(self, event, _, thread_lock):
+        events.Events.serverInit(self, event, _, thread_lock)
+        server = self.servers[event['port']]
+        if server.port == 27282:
+            logger.info('Setting cameraViewScale to 120')
+            server.testCameraViewScale(120)
+            logger.info('Setting gravityMode to 3')
+            server.testGravityMode(3)
+
+
+    def clientAdd(self, event, _, thread_lock):
+        events.Events.clientAdd(self, event, _, thread_lock)
+        server = self.servers[event['port']]
+        if server.port != 27282: return
+
+        player = server.get_player_by_number(event['player'])
+        if not player.is_bot():
+            logger.info("%s joined %s from %s" % (player.nickname, server.serverName, player.ip))
+            player.whisper("*********************************************************************")
+            player.whisper("Enter the base and touch the flag inside to claim it for")
+            player.whisper("your team.  Then keep the other team from touching it!")
+            player.whisper("Hold it for one minute consecutively to score a point.")
+            player.whisper("~~~Special Commands~~~")
+            player.whisper("/attach <player_name> - Spawn at your teammate's loc")
+            player.whisper("/a - Shortcut to attach to your last attached teammate.")
+            player.whisper("*********************************************************************")
+
+
     def mapChange(self, event, _, thread_lock):
         # NOTE
         # When  you override an event in a module, you

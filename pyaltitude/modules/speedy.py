@@ -84,12 +84,32 @@ class SpeedyModule(module.MapModule):
 
             normalized_angle = self._norm_angle(player.angle)
             forcex, forcey = self.force_parallel_w_angle(normalized_angle)
-            logger.info("Pushing %s for angle %s with x:%s, y:%s" %(player.nickname, normalized_angle, forcex, forcey))
+            logger.debug("Pushing %s for angle %s with x:%s, y:%s" %(player.nickname, normalized_angle, forcex, forcey))
             player.applyForce(forcex, forcey)
             time.sleep(wait)
 
         logger.debug('Speedy thread stopped')
 
+    """
+    TODO BUG!!! Inheriting the same event in multiple modules causes only the
+    last to be honored.  Time for a refactor!  Opening an issue.
+
+    def clientAdd(self, event, _, thread_lock):
+        events.Events.clientAdd(self, event, _, thread_lock)
+        server = self.servers[event['port']]
+        if server.map.name !=  self.map: return
+
+        player = server.get_player_by_number(event['player'])
+        if not player.is_bot():
+            logger.info("%s joined %s from %s" % (player.nickname, server.serverName, player.ip))
+            player.whisper("*********************************************************************")
+            player.whisper("In this arena, the ball carrier gets a speed boost of sorts.")
+            player.whisper("It seems a bit slippery too, but you don't need to thrust to")
+            player.whisper("move at high speed.  Still working out the details.")
+            player.whisper("Highly experimental, but kind of neat.")
+            player.whisper("Arriba Arriba!  Andale Arriba!  Yeppa!!")
+            player.whisper("*********************************************************************")
+    """
 
     def powerupPickup(self, event, _, thread_lock):
         # NOTE If the module classes are subclassed properly, I think

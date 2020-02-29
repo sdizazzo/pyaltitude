@@ -67,7 +67,7 @@ class Worker(Events):
         # SERVER
         # 
         # Will do for all (server?) modules
-        mods = (king_of_the_hill.KOTH, speedy.SpeedyModule)
+        mods = (king_of_the_hill.KOTH, speedy.SpeedyModule, lobby.Lobby)
         for module in mods:
             module.servers = self.servers
             for func_name in get_module_events(module()):
@@ -159,6 +159,9 @@ class Main(object):
                 logger.exception('Worker raised exception: %s' % repr(e))
 
 
+    # It looks like adding that short sleep whn the rollover happens
+    # to give it a chance to start before reading from it solves
+    # https://github.com/sdizazzo/pyaltitude/issues/15 
     def tail(self, rollover=False):
         if rollover:
             logger.info("Tailing log file after rollover at %s" % PATH)
@@ -168,8 +171,14 @@ class Main(object):
         with open(PATH, 'rt') as f:
             inode = os.fstat(f.fileno()).st_ino
             while True:
+                log_txt_retry = 0
                 line = f.readline()
                 if not line:
+                    # Give the log a chance to rollover
+                    while not os.path.exists(PATH) and log_txt_retry < 4:
+                        time.sleep(.1)
+                        log_txt_retry +=1
+
                     if os.stat(PATH).st_ino != inode:
                         break
                     time.sleep(0.01)

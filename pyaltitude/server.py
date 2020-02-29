@@ -15,6 +15,14 @@ MockMap = namedtuple('MockMap', ('state', 'name'), defaults = (None, None))
 
 logger = logging.getLogger(__name__)
 
+class ServerLauncher(base.Base):
+
+    def parse(self, attrs):
+        super().parse(attrs, convert_types=True)
+        logger.info('Initialilzed ServerLauncher with IP %s' % (self.ip))
+        return self
+
+
 class Server(base.Base, commands.Commands):
 
     def __init__(self):
@@ -40,7 +48,7 @@ class Server(base.Base, commands.Commands):
             if event.is_set():
                 break
             subprocess.run(cmd, shell=True)
-            time.sleep(.1)
+            time.sleep(.15)
 
 
     def add_player(self, player, message=True):
@@ -55,6 +63,7 @@ class Server(base.Base, commands.Commands):
         self.players.remove(player)
         self.players_changed(player, False, message=message)
 
+
     def players_changed(self, player, added, message=True):
         if not player.is_bot():
             if added:
@@ -66,7 +75,7 @@ class Server(base.Base, commands.Commands):
             #TODO HACK!!!
             #
             # only log plane positions on King of the Hill
-            if self.port in (27282, 27283) and player_count == 1 and not self.log_planes_thread:
+            if self.port in (27282, 27283, 27284) and player_count == 1 and not self.log_planes_thread:
                 #when the first player enters the arena, start the log planes thread
                 logger.info('Starting log plane thread on %s' % self.serverName)
                 self.log_planes_thread = Thread(target=self.log_planes, args=(self.log_planes_event, ),daemon=True)
@@ -75,7 +84,7 @@ class Server(base.Base, commands.Commands):
             #
             # TODO HACK!!!!
             #
-            elif self.port in (27282, 27283) and player_count == 0:
+            elif self.port in (27282,27283, 27284) and player_count == 0:
                 # last player leaves, stop it
                 logger.info('Stopping log plane thread on %s' % self.serverName)
                 self.log_planes_event.set()
@@ -102,19 +111,31 @@ class Server(base.Base, commands.Commands):
         # execute this on the worker threads.  Not sure how feasible that is 
         # since it's not an event.
         #
+        # This does execute on one worker thread, but splitting it up further
+        # would be a challenge
+
         for pid, coords in event['positionByPlayer'].items():
             player = self.get_player_by_number(int(pid), bots=True)
             x, y, angle = coords.split(',')
 
             # calculate a simple velocity
             if player.is_alive() and all((player.x, player.y, player.angle, player.time)):
+
+                # This should fix the ZeroDivisionError errors
+                # Still seems weird that the server is sending events
+                # with the same tick.
+                # I guess I'm sending too many requests...?
+                if now == player.time:
+                    logger.warning("Skipping velocity event for %s as time had not changed.  Time: %s" %  (player.nickname, now))
+                    #NOTE@@
+                    # is this lag??
+                    # Can I get the ping and report it when this happens?
+                    # at first look I dont see a way.
+                    continue
+
                 distance = self.calc_distance(player.x, int(x), player.y, int(y))
                 elapsed = now - player.time
-                # hmmmm....
-                # got a ZeroDivisionError here
-                # not convinced yet. Its late.
                 player.velocity = distance/elapsed
-                logger.debug("Set player velocity: %s" % player.velocity)
 
             player.x, player.y, player.angle, player.time = (int(x), int(y), int(angle), now)
 

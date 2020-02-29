@@ -54,3 +54,8 @@ class Commands(object):
 
     def overrideBallScore(self, leftscore, rightscore):
         self._send('overrideBallScore', leftscore, rightscore)
+
+    def serverRequestPlayerChangeServer(self, nick, ip, port, secret_code=None):
+        ip = ip +':'+str(port)
+        self._send('serverRequestPlayerChangeServer', nick, ip, secret_code)
+

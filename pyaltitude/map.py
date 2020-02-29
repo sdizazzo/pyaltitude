@@ -84,6 +84,7 @@ class Map(base.Base):
         with lzma.open(self.path, 'rb') as fi:
             count = struct.unpack('<i', fi.read(4))[0]
             
+
             files = list()
             for i in range(count):
                 length = struct.unpack_from('<h', fi.read(2), offset=0)[0]
@@ -107,5 +108,3 @@ class Map(base.Base):
         logger.info("Loaded map %s on %s" % (self.name, self.server.serverName))
         return self
 
-if __name__ == "__main__":
-    m = Map(None, 'tbd_asteroids')

@@ -13,24 +13,16 @@ logger = logging.getLogger(__name__)
 
 """
 Fun module that tries to speed up the player by pushing them
-along the same angle they are flying (pointing) whenever they
-are carrying the ball.
-
-Might find use in some games as a powerup since you dont even
-need to thrust to fly at high speed.  Or maybe a game where 
-everybody is flying around like this.
-
-COuld it be modified to allow the user to change the amount 
-based on a key press?
+along the same path they are flying.  There is some lag, so
+it feels like you are sliding around on ice.  It's gotten a
+decent response so far.  I call it Speed Ball.
 
 """
 
-class SpeedyModule(module.MapModule):
-    speedy_thread = None
-    speedy_event = Event()
+class SpeedyModule(module.ServerModule):
 
-    def __init__(self, map='ball_football'):
-        self.map = map
+    def __init__(self, port=27283):
+        self.port = port
         super().__init__(self, map)
 
     def _norm_angle(self, angle):
@@ -46,40 +38,35 @@ class SpeedyModule(module.MapModule):
 
 
     def force_parallel_w_angle(self, angle, multiplier=3):
-        for i in range(0, 360):
-            if 0 < angle <= 90 or 270 < angle <= 360:
-                xsign = 1
-            else:
-                xsign = -1
+        # Im not practiced in math, but after some research,
+        # this seems to get somewhat close for now.
+        # The constant is arbitrary to make it work with
+        # the multiplier
 
-            if 0 < angle <= 180:
-                ysign = 1
-            else:
-                ysign = -1
+        # Thanks to WhetamP for helping me figure out that I
+        # needed to pass radians to cos() and sin()!
+        rads = angle * (math.pi/180)
+        xforce = math.cos(rads)*1.2
+        yforce = math.sin(rads)*1.2
 
-            if angle == i:
-                # Im not practiced in math, but after some research,
-                # this seems to get somewhat close for now.
-                # The constant is arbitrary to make it work with
-                # the multiplier
-                xforce = abs(math.cos(angle))*1.3*xsign
-                yforce = abs(math.sin(angle))*1.3*ysign
-                break
-
-        retx, rety = int(xforce*multiplier) , int(yforce*multiplier)
+        retx = self._clamp(int(xforce*multiplier), -15, 15)
+        rety = self._clamp(int(yforce*multiplier), -15, 15)
         
-        retx = self._clamp(retx, -15, 15)
-        rety = self._clamp(rety, -15, 15)
-
         return retx, rety
 
 
-    def be_speedy(self, server, player, event):
+    def be_speedy(self, server, player):
         logger.debug('Speedy thread started')
-        
-        wait = .1
+        player.whisper("3")
+        time.sleep(1)
+        player.whisper("2")
+        time.sleep(1)
+        player.whisper("1")
+        time.sleep(1)
+        player.whisper("Arriba Arriba!  Andale Arriba!  Yeppa!!")
+        wait = .2
         while True:
-            if event.is_set() or not player.is_alive():
+            if player.game_event.is_set() or not player.is_alive():
                 break
 
             normalized_angle = self._norm_angle(player.angle)
@@ -97,7 +84,7 @@ class SpeedyModule(module.MapModule):
     def clientAdd(self, event, _, thread_lock):
         events.Events.clientAdd(self, event, _, thread_lock)
         server = self.servers[event['port']]
-        if server.map.name !=  self.map: return
+        if server.port !=  self.port: return
 
         player = server.get_player_by_number(event['player'])
         if not player.is_bot():
@@ -111,29 +98,20 @@ class SpeedyModule(module.MapModule):
             player.whisper("*********************************************************************")
     """
 
-    def powerupPickup(self, event, _, thread_lock):
+    def spawn(self, event, _, thread_lock):
         # NOTE If the module classes are subclassed properly, I think
         # I can make these calls to the event super method automatic
         # Relying on a user to mke them in every module event is error prone
-        events.Events.powerupPickup(self, event, _, thread_lock)
+        events.Events.spawn(self, event, _, thread_lock)
 
         server = self.servers[event['port']]
-        if server.map.name !=  self.map: return
-        if event['powerup'] != 'Ball': return
+        if server.port !=  self.port: return
 
         player = server.get_player_by_number(event['player'])
 
-        SpeedyModule.speedy_event.clear()
-        SpeedyModule.speedy_thread = Thread(target=self.be_speedy, args=(server, player, SpeedyModule.speedy_event), daemon=True)
-        SpeedyModule.speedy_thread.start()
-
-
-    def powerupUse(self, event, _, thread_lock):
-        events.Events.powerupUse(self, event, _, thread_lock)
-
-        server = self.servers[event['port']]
-        if server.map.name !=  self.map: return
-        if event['powerup'] != 'Ball': return
-
-        SpeedyModule.speedy_event.set()
+        # Put the thread on the player itself!
+        #much easier to track that way
+        player.game_event.clear()
+        player.game_thread = Thread(target=self.be_speedy, args=(server, player), daemon=True)
+        player.game_thread.start()
 

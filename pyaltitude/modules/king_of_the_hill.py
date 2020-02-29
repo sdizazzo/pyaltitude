@@ -138,6 +138,10 @@ class KOTH(module.MapModule):
             server.testGravityMode(3)
 
 
+    # Since I still havent done the refactor for multiple modules
+    # to use the same events, I commented clientAdd out here
+    # so it could be used in the Lobby module for now.
+    """
     def clientAdd(self, event, _, thread_lock):
         events.Events.clientAdd(self, event, _, thread_lock)
         server = self.servers[event['port']]
@@ -154,6 +158,7 @@ class KOTH(module.MapModule):
             player.whisper("/attach <player_name> - Spawn at your teammate's loc")
             player.whisper("/a - Shortcut to attach to your last attached teammate.")
             player.whisper("*********************************************************************")
+    """
 
 
     def mapChange(self, event, _, thread_lock):

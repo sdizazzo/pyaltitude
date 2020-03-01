@@ -28,7 +28,7 @@ from pyaltitude.events import Events
 from pyaltitude.map import Map
 from pyaltitude.enums import MapState
 from pyaltitude.player import Player
-from pyaltitude.server import Server
+from pyaltitude.server import Server, ServerLauncher
 from pyaltitude.modules import *
 #from pyaltitude.custom_commands import attach
 
@@ -84,7 +84,7 @@ class Worker(Events):
             self.logger.debug("Processing event %s" % event)
             method = getattr(self, event['type'])
         except AttributeError as e:
-            #self.logger.warning(repr(NotImplementedError(event['type'])))
+            self.logger.debug(repr(NotImplementedError(event['type'])))
             return
         
         method(event, self.init, self.thread_lock)
@@ -196,9 +196,14 @@ class Main(object):
             contents = f.read()
 
         root = ET.fromstring(contents)
+        logger.info(root.attrib)
+        server_launcher = ServerLauncher()
+        server_launcher = server_launcher.parse(root.attrib)
+        
         for server_config in root.iter("AltitudeServerConfig"):
             server = Server()
             server = server.parse(server_config.attrib)
+            server.server_launcher = server_launcher
             servers[server.port] = server
 
         mapList = root.find('mapList')

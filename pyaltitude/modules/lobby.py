@@ -55,10 +55,7 @@ class Lobby(module.ServerModule):
             # check their position and see if they are in one of the portals
             if 288 < player.x < 352 and 860 < player.y < 1020:
                 logger.info("Sending changeServer request")
-                #
-                # NOTE IP will be coming from ServerLauncher, but still in dev
-                #
-                server.serverRequestPlayerChangeServer(player.nickname, 'xx.xx.xx.xx', 27283, secret_code=None)
+                server.serverRequestPlayerChangeServer(player.nickname, server.server_launcher.ip, 27283, secret_code=None)
                 break
 
             time.sleep(WAIT)

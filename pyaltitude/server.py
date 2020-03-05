@@ -2,7 +2,6 @@ import uuid, time
 import math
 import subprocess, logging
 from collections import namedtuple
-from threading import Thread, Event
 
 from . import base
 from . import commands
@@ -37,19 +36,6 @@ class Server(base.Base, commands.Commands):
 
         self.map = MockMap()
 
-        self.log_planes_thread = None
-        self.log_planes_event = Event()
-
-
-    def log_planes(self, event):
-        this_cmd = "%s,console,logPlanePositions" % self.port
-        cmd = '/bin/echo "%s" >> %s' % (this_cmd, COMMAND_PATH)
-        while 1:
-            if event.is_set():
-                break
-            subprocess.run(cmd, shell=True)
-            time.sleep(.15)
-
 
     def add_player(self, player, message=True):
         logger.info('Adding player %s to server %s' % (player.nickname, self.serverName))
@@ -71,26 +57,6 @@ class Server(base.Base, commands.Commands):
                 player.whisper('Welcome to %s!' % self.serverName)
 
             player_count = len(self.get_players())
-            #
-            #TODO HACK!!!
-            #
-            # only log plane positions on King of the Hill
-            if self.port in (27282, 27283, 27284) and player_count == 1 and not self.log_planes_thread:
-                #when the first player enters the arena, start the log planes thread
-                logger.info('Starting log plane thread on %s' % self.serverName)
-                self.log_planes_thread = Thread(target=self.log_planes, args=(self.log_planes_event, ),daemon=True)
-                self.log_planes_thread.start()
-    
-            #
-            # TODO HACK!!!!
-            #
-            elif self.port in (27282,27283, 27284) and player_count == 0:
-                # last player leaves, stop it
-                logger.info('Stopping log plane thread on %s' % self.serverName)
-                self.log_planes_event.set()
-                time.sleep(1)
-                self.log_planes_thread = None
-                self.log_planes_event = Event()
 
             if message:
                 self.serverMessage('%s players now in server' % player_count)

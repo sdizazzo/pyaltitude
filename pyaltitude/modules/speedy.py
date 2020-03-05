@@ -37,7 +37,7 @@ class SpeedyModule(module.ServerModule):
         return max(min(max_, n), min_)
 
 
-    def force_parallel_w_angle(self, angle, multiplier=3):
+    def force_parallel_w_angle(self, angle, multiplier=2):
         # Im not practiced in math, but after some research,
         # this seems to get somewhat close for now.
         # The constant is arbitrary to make it work with
@@ -46,8 +46,8 @@ class SpeedyModule(module.ServerModule):
         # Thanks to WhetamP for helping me figure out that I
         # needed to pass radians to cos() and sin()!
         rads = angle * (math.pi/180)
-        xforce = math.cos(rads)*1.2
-        yforce = math.sin(rads)*1.2
+        xforce = math.cos(rads)*1.15
+        yforce = math.sin(rads)*1.15
 
         retx = self._clamp(int(xforce*multiplier), -15, 15)
         rety = self._clamp(int(yforce*multiplier), -15, 15)
@@ -64,7 +64,7 @@ class SpeedyModule(module.ServerModule):
         player.whisper("1")
         time.sleep(1)
         player.whisper("Arriba Arriba!  Andale Arriba!  Yeppa!!")
-        wait = .2
+        wait = .1
         while True:
             if player.game_event.is_set() or not player.is_alive():
                 break

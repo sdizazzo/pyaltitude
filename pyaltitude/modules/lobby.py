@@ -48,15 +48,25 @@ class Lobby(module.ServerModule):
     def portal_runner(self, server, player):
         logger.info('Portal thread started')
         WAIT = .1
+        sent = False
+        ts = None
         while True:
             if player.game_event.is_set():
                 break
 
             # check their position and see if they are in one of the portals
             if 288 < player.x < 352 and 860 < player.y < 1020:
-                logger.info("Sending changeServer request")
-                server.serverRequestPlayerChangeServer(player.nickname, server.server_launcher.ip, 27283, secret_code=None)
-                break
+                if not sent:
+                    #need to retry this in case of packet loss
+                    #while player in server.get_players():
+                    logger.info("Sending changeServer request")
+                    server.serverMessage('%s is entering %s' % (player.nickname, server.serverName))
+                    server.serverRequestPlayerChangeServer(player.nickname, server.launcher.ip, 27283, secret_code='foo')
+                    ts = time.time()
+                    sent = True
+
+            if sent and time.time() - ts > 2:
+                sent = False
 
             time.sleep(WAIT)
 

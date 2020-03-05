@@ -159,9 +159,6 @@ class Main(object):
                 logger.exception('Worker raised exception: %s' % repr(e))
 
 
-    # It looks like adding that short sleep whn the rollover happens
-    # to give it a chance to start before reading from it solves
-    # https://github.com/sdizazzo/pyaltitude/issues/15 
     def tail(self, rollover=False):
         if rollover:
             logger.info("Tailing log file after rollover at %s" % PATH)
@@ -171,14 +168,8 @@ class Main(object):
         with open(PATH, 'rt') as f:
             inode = os.fstat(f.fileno()).st_ino
             while True:
-                log_txt_retry = 0
                 line = f.readline()
                 if not line:
-                    # Give the log a chance to rollover
-                    while not os.path.exists(PATH) and log_txt_retry < 4:
-                        time.sleep(.1)
-                        log_txt_retry +=1
-
                     if os.stat(PATH).st_ino != inode:
                         break
                     time.sleep(0.01)
@@ -196,14 +187,13 @@ class Main(object):
             contents = f.read()
 
         root = ET.fromstring(contents)
-        logger.info(root.attrib)
         server_launcher = ServerLauncher()
         server_launcher = server_launcher.parse(root.attrib)
         
         for server_config in root.iter("AltitudeServerConfig"):
             server = Server()
             server = server.parse(server_config.attrib)
-            server.server_launcher = server_launcher
+            server.launcher = server_launcher
             servers[server.port] = server
 
         mapList = root.find('mapList')

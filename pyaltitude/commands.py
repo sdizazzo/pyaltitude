@@ -11,6 +11,9 @@ class Commands(object):
         #get the path from the config
         self.cmd = "%s,console," % self.port
 
+        #NOTE You can also send a `27283,restart` command, or perhaps
+        #`-1,restart` to restart the server
+        # not sure how it works, but noticed it browsing through the code
 
     def _send(self, cmd_name, *args):
         this_cmd = self.cmd[:]
@@ -26,6 +29,8 @@ class Commands(object):
         self._send('listPlayers')
 
     def serverWhisper(self, nick, message):
+        #once we pass in players check if it's a bort
+        # and don't whisper if it is
         self._send('serverWhisper', nick.replace(' ', '\ '), message)
 
     def serverMessage(self, message):
@@ -38,7 +43,7 @@ class Commands(object):
         self._send('applyForce', player, x, y)
 
     def assignTeam(self, nick, team):
-        self._send('assignTeam', nick, team)
+        self._send('assignTeam', nick.replace(' ', '\ '), team)
 
     def balanceTeams(self):
         self._send('balanceTeams')
@@ -57,5 +62,5 @@ class Commands(object):
 
     def serverRequestPlayerChangeServer(self, nick, ip, port, secret_code=None):
         ip = ip +':'+str(port)
-        self._send('serverRequestPlayerChangeServer', nick, ip, secret_code)
+        self._send('serverRequestPlayerChangeServer', nick.replace(' ', '\ '), ip, secret_code)
 

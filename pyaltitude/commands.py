@@ -28,10 +28,11 @@ class Commands(object):
     def listPlayers(self):
         self._send('listPlayers')
 
-    def serverWhisper(self, nick, message):
+    def serverWhisper(self, player, message):
         #once we pass in players check if it's a bort
         # and don't whisper if it is
-        self._send('serverWhisper', nick.replace(' ', '\ '), message)
+        if player.is_bot(): return
+        self._send('serverWhisper', player.nickname.replace(' ', '\ '), message)
 
     def serverMessage(self, message):
         self._send('serverMessage', message)
@@ -40,10 +41,10 @@ class Commands(object):
         self._send('changeMap', map)
 
     def applyForce(self, player, x, y):
-        self._send('applyForce', player, x, y)
+        self._send('applyForce', player.player, x, y)
 
-    def assignTeam(self, nick, team):
-        self._send('assignTeam', nick.replace(' ', '\ '), team)
+    def assignTeam(self, player, team):
+        self._send('assignTeam', player.nickname.replace(' ', '\ '), team)
 
     def balanceTeams(self):
         self._send('balanceTeams')
@@ -54,13 +55,13 @@ class Commands(object):
     def testCameraViewScale(self, scale):
         self._send('testCameraViewScale', scale)
 
-    def overrideSpawnPoint(self, nick, x, y, angle):
-        self._send('overrideSpawnPoint', nick.replace(' ', '\ '), x, y, angle)
+    def overrideSpawnPoint(self, player, x, y, angle):
+        self._send('overrideSpawnPoint', player.nickname.replace(' ', '\ '), x, y, angle)
 
     def overrideBallScore(self, leftscore, rightscore):
         self._send('overrideBallScore', leftscore, rightscore)
 
-    def serverRequestPlayerChangeServer(self, nick, ip, port, secret_code=None):
+    def serverRequestPlayerChangeServer(self, player, ip, port, secret_code=None):
         ip = ip +':'+str(port)
-        self._send('serverRequestPlayerChangeServer', nick.replace(' ', '\ '), ip, secret_code)
+        self._send('serverRequestPlayerChangeServer', player.nickname.replace(' ', '\ '), ip, secret_code)
 

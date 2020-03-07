@@ -155,8 +155,8 @@ class Events(object):
         from_player.whisper('Attaching to %s' % to_player.nickname)
         to_player.whisper('%s is attaching to you!' % from_player.nickname)
 
-        server.overrideSpawnPoint(from_player.nickname, to_player.x, to_player.y, 0)
-        server.assignTeam(from_player.nickname, 0 if from_player.team == server.map.leftTeam else 1)
+        server.overrideSpawnPoint(from_player, to_player.x, to_player.y, 0)
+        server.assignTeam(from_player, 0 if from_player.team == server.map.leftTeam else 1)
         from_player.attached = True
         logger.info('%s attached to %s' % (from_player.nickname, to_player.nickname))
 

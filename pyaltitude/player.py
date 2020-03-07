@@ -44,17 +44,17 @@ class Player(base.Base):
                 setattr(self, k, v)
 
     def whisper(self, message):
-        self.server.serverWhisper(self.nickname, message)
+        self.server.serverWhisper(self, message)
 
     def applyForce(self, x, y):
-        self.server.applyForce(self.player, x, y)
+        self.server.applyForce(self, x, y)
 
     def spawned(self):
         #reset our spawn point after a call to /attach
         if self.attached:
             time.sleep(.2) # where does this sleep run????  in a thread only is
                            # acceptable...yes Worker()
-            self.server.overrideSpawnPoint(self.nickname, 0, 0, 0)
+            self.server.overrideSpawnPoint(self, 0, 0, 0)
         self.attached = False
 
     def is_alive(self):

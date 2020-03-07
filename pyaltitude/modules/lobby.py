@@ -96,7 +96,7 @@ class Lobby(module.ServerModule):
                 dest_server = servers[dest_port]
                 logger.info("Sending %s to server %s" % (player.nickname, dest_server.serverName))
                 server.serverMessage('%s is entering %s' % (player.nickname, dest_server.serverName))
-                server.serverRequestPlayerChangeServer(player.nickname, server.launcher.ip, dest_port, secret_code=None)
+                server.serverRequestPlayerChangeServer(player, server.launcher.ip, dest_port, secret_code=None)
                 ts = time.time()
                 sent = True
 

@@ -45,26 +45,63 @@ class Lobby(module.ServerModule):
         super().__init__(self, port)
 
 
-    def portal_runner(self, server, player):
+    def point_in_circle(self, center_x, center_y, x, y, radius=95):
+        dx = abs(x-center_x)
+        dy = abs(y-center_y)
+        R = radius
+
+        if dx>R or dy>R: return False
+
+        if dx + dy <= R:
+            return True
+
+        if dx**2 + dy**2 <= R**2:
+            return True
+        else:
+            return False
+
+
+    def portal_runner(self, server, player, servers):
         logger.info('Portal thread started')
         WAIT = .1
         sent = False
-        ts = None
+        dest_port = None
+        ts = 0
         while True:
             if player.game_event.is_set():
                 break
 
-            # check their position and see if they are in one of the portals
-            if 288 < player.x < 352 and 860 < player.y < 1020:
-                if not sent:
-                    #need to retry this in case of packet loss
-                    #while player in server.get_players():
-                    logger.info("Sending changeServer request")
-                    server.serverMessage('%s is entering %s' % (player.nickname, server.serverName))
-                    server.serverRequestPlayerChangeServer(player.nickname, server.launcher.ip, 27283, secret_code='foo')
-                    ts = time.time()
-                    sent = True
+            #Speed ball
+            if self.point_in_circle(448, 830, player.x, player.y):
+                dest_port = 27283
+                #
+                # TODO make it nice and tidy
+                #
+                #player.change_server(servers[port])
 
+            #King of the Hill
+            elif self.point_in_circle(2980, 830, player.x, player.y):
+                dest_port = 27282
+
+            #FFA Wide Angle
+            elif self.point_in_circle(1174, 1264, player.x, player.y):
+                dest_port = 27279
+
+            #Wide Angle
+            elif self.point_in_circle(2290, 1264, player.x, player.y):
+                dest_port = 27278
+
+
+            if dest_port and not sent:
+                dest_server = servers[dest_port]
+                logger.info("Sending %s to server %s" % (player.nickname, dest_server.serverName))
+                server.serverMessage('%s is entering %s' % (player.nickname, dest_server.serverName))
+                server.serverRequestPlayerChangeServer(player.nickname, server.launcher.ip, dest_port, secret_code=None)
+                ts = time.time()
+                sent = True
+
+            #need to retry this in case of packet loss
+            # TODO It doesn't seem to help, though...
             if sent and time.time() - ts > 2:
                 sent = False
 
@@ -86,7 +123,7 @@ class Lobby(module.ServerModule):
 
         player = server.get_player_by_number(event['player'])
 
-        player.game_thread = Thread(target=self.portal_runner, args=(server, player) , daemon=True)
+        player.game_thread = Thread(target=self.portal_runner, args=(server, player, self.servers) , daemon=True)
         player.game_thread.start()
 
 

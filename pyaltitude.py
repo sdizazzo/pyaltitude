@@ -41,10 +41,10 @@ logger = logging.getLogger('pyaltitude')
 class Worker(Events):
     logger = logging.getLogger('pyaltitude.Worker')
 
-    def __init__(self, line, init, servers, thread_lock):
+    def __init__(self, line, init, server_launcher, thread_lock):
         self.line = line
         self.init = init
-        self.servers = servers
+        self.server_launcher = server_launcher
         self.thread_lock = thread_lock
 
 
@@ -69,7 +69,7 @@ class Worker(Events):
         # Will do for all (server?) modules
         mods = (king_of_the_hill.KOTH, speedy.SpeedyModule, lobby.Lobby)
         for module in mods:
-            module.servers = self.servers
+            module.server_launcher = self.server_launcher
             for func_name in get_module_events(module()):
                 func = getattr(module(), func_name)
                 setattr(self, func_name, func)
@@ -117,7 +117,7 @@ class Main(object):
     def run(self, logfile=None, debug=False):
         self.setup_logging(logfile, debug)
 
-        self.servers = self.parse_server_config()
+        self.server_launcher = self.parse_server_config()
         self.queue = queue.Queue()
         self.thread_lock = threading.Lock()
 
@@ -139,7 +139,7 @@ class Main(object):
             while True:
                 try:
                     (line, INIT) = self.queue.get()
-                    worker = Worker(line, INIT, self.servers, self.thread_lock)
+                    worker = Worker(line, INIT, self.server_launcher, self.thread_lock)
                     future = pool.submit(worker.execute)
                     future.add_done_callback(self.worker_done_cb)
                     time.sleep(.01)
@@ -194,10 +194,10 @@ class Main(object):
             server = Server()
             server = server.parse(server_config.attrib)
             server.launcher = server_launcher
-            servers[server.port] = server
+            server.launcher.servers.append(server)
 
-        mapList = root.find('mapList')
-        return servers
+        #mapList = root.find('mapList')
+        return server_launcher
  
 
 if __name__ == "__main__":

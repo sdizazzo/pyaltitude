@@ -27,7 +27,7 @@ class Events(object):
         date_str = event['date'][:-8]
         date = datetime.strptime(date_str, "%Y %b %d %H:%M:%S").replace(tzinfo=EST())
         logger.info("Session officially starts at (Nimbly time): %s" % date)
-        for server in self.servers.values():
+        for server in self.server_launcher.servers:
             server.start = date
             server.time = 0
 
@@ -36,14 +36,14 @@ class Events(object):
 
 
     def clientAdd(self, event, INIT, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         player = Player(server)
         player = player.parse(event)
         server.add_player(player, message =not INIT)
 
 
     def clientRemove(self, event, INIT, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
 
         # see https://github.com/sdizazzo/pyaltitude/issues/4
         player = server.get_player_by_vaporId(event['vaporId'])
@@ -51,7 +51,7 @@ class Events(object):
 
 
     def spawn(self, event, _, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         #{'plane': 'Biplane', 'port': 27280, 'perkGreen': 'Heavy Armor',
         #'perkRed': 'Heavy Cannon', 'skin': 'No Skin', 'team': 4, 'time':
         #18018150, 'type': 'spawn', 'perkBlue': 'Ultracapacitor', 'player': 2}
@@ -60,12 +60,12 @@ class Events(object):
 
 
     def logPlanePositions(self, event, _, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         server.map_player_positions(event)
 
 
     def mapLoading(self, event, _, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         #{'port': 27279, 'time': 16501201, 'type': 'mapLoading', 'map':'ffa_core'}
         # THis event gives us the map name which is enough to
         # instatiate the map object and begin parsing the map 
@@ -78,8 +78,7 @@ class Events(object):
 
 
     def serverHitch(self, event, _, thread_lock):
-        #{"duration":631.8807983398438,"port":27278,"time":3367621,"type":"serverHitch","changedMap":false}
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         server.serverMessage('ServerHitch: %.2f' % event['duration'])
         logger.warning('ServerHitch: %.2f, %s' % (event['duration'], server.serverName))
 
@@ -101,7 +100,7 @@ class Events(object):
 
 
     def mapChange(self, event, _, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         #{"mode":"ball","rightTeam":5,"port":27278,"leftTeam":6,"time":5808529,"type":"mapChange","map":"ball_cave"}
 
         wait = .5
@@ -119,15 +118,15 @@ class Events(object):
 
 
     def playerInfoEv(self, event, _, thread_lock):
-        server = self.servers[event['port']]
-        if event['leaving']: return             #<-----  That was all I needed for my player tracking problems!
+        server = self.server_launcher.server_for_port(event['port'])
+        if event['leaving']: return
 
         player = server.get_player_by_number(event['player'])
         player.parse_playerInfoEv(event)
 
 
     def teamChange(self, event, _, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         player = server.get_player_by_number(event['player'])
         player.team = event['team']
 
@@ -162,7 +161,7 @@ class Events(object):
 
 
     def consoleCommandExecute(self, event, _, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
 
         #
         # Custom commands - More shit to do!!!

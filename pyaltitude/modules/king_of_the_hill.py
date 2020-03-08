@@ -124,13 +124,14 @@ class KOTH(module.MapModule):
 
         logger.debug('Flag timer ended')
 
+
     #################
     # Events
     #################
 
     def serverInit(self, event, _, thread_lock):
         events.Events.serverInit(self, event, _, thread_lock)
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         if server.port == 27282:
             logger.info('Setting cameraViewScale to 120')
             server.testCameraViewScale(120)
@@ -172,7 +173,7 @@ class KOTH(module.MapModule):
         # out the modules into types: server, game, map
         events.Events.mapChange(self, event, _, thread_lock)
 
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         if server.port == 27282:
             with thread_lock:
                 KOTH.flag_timer_event.set()
@@ -183,7 +184,7 @@ class KOTH(module.MapModule):
     def powerupAutoUse(self, event, _, thread_lock):
         events.Events.powerupAutoUse(self, event, _, thread_lock)
 
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         if server.map.name != self.map_name: return
         if event['powerup'] != 'Health' or (event['positionX'], event['positionY']) != (1501, 1735): return
         #THis is the right powerup

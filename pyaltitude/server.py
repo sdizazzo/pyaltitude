@@ -15,6 +15,12 @@ MockMap = namedtuple('MockMap', ('state', 'name'), defaults = (None, None))
 logger = logging.getLogger(__name__)
 
 class ServerLauncher(base.Base):
+    servers = list()
+
+    def server_for_port(self, port):
+        for server in self.servers:
+            if server.port == port:
+                return server
 
     def parse(self, attrs):
         super().parse(attrs, convert_types=True)

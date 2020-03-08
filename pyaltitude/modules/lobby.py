@@ -45,7 +45,7 @@ class Lobby(module.ServerModule):
         super().__init__(self, port)
 
 
-    def point_in_circle(self, center_x, center_y, x, y, radius=95):
+    def point_in_circle(self, center_x, center_y, x, y, radius=80):
         dx = abs(x-center_x)
         dy = abs(y-center_y)
         R = radius
@@ -61,7 +61,7 @@ class Lobby(module.ServerModule):
             return False
 
 
-    def portal_runner(self, server, player, servers):
+    def portal_runner(self, server, player):
         logger.info('Portal thread started')
         WAIT = .1
         sent = False
@@ -93,7 +93,7 @@ class Lobby(module.ServerModule):
 
 
             if dest_port and not sent:
-                dest_server = servers[dest_port]
+                dest_server = server.launcher.server_for_port(dest_port)
                 logger.info("Sending %s to server %s" % (player.nickname, dest_server.serverName))
                 server.serverMessage('%s is entering %s' % (player.nickname, dest_server.serverName))
                 server.serverRequestPlayerChangeServer(player, server.launcher.ip, dest_port, secret_code=None)
@@ -118,17 +118,17 @@ class Lobby(module.ServerModule):
 
     def clientAdd(self, event, _, thread_lock):
         events.Events.clientAdd(self, event, _, thread_lock)
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         if server.port != self.port: return
 
         player = server.get_player_by_number(event['player'])
 
-        player.game_thread = Thread(target=self.portal_runner, args=(server, player, self.servers) , daemon=True)
+        player.game_thread = Thread(target=self.portal_runner, args=(server, player) , daemon=True)
         player.game_thread.start()
 
 
     def clientRemove(self, event, _, thread_lock):
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         if server.port == self.port:
             player = server.get_player_by_number(event['player'])
             player.game_event.set()

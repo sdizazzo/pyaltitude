@@ -64,15 +64,18 @@ class SpeedyModule(module.ServerModule):
         player.whisper("1")
         time.sleep(1)
         player.whisper("Arriba Arriba!  Andale Arriba!  Yeppa!!")
+
         wait = .1
         while True:
             if player.game_event.is_set() or not player.is_alive():
                 break
 
-            normalized_angle = self._norm_angle(player.angle)
-            forcex, forcey = self.force_parallel_w_angle(normalized_angle)
-            logger.debug("Pushing %s for angle %s with x:%s, y:%s" %(player.nickname, normalized_angle, forcex, forcey))
-            player.applyForce(forcex, forcey)
+            if player.is_alive():
+                normalized_angle = self._norm_angle(player.angle)
+                forcex, forcey = self.force_parallel_w_angle(normalized_angle)
+                logger.debug("Pushing %s for angle %s with x:%s, y:%s" %(player.nickname, normalized_angle, forcex, forcey))
+                player.applyForce(forcex, forcey)
+
             time.sleep(wait)
 
         logger.debug('Speedy thread stopped')
@@ -83,7 +86,7 @@ class SpeedyModule(module.ServerModule):
 
     def clientAdd(self, event, _, thread_lock):
         events.Events.clientAdd(self, event, _, thread_lock)
-        server = self.servers[event['port']]
+        server = self.server_launcher.server_for_port(event['port'])
         if server.port !=  self.port: return
 
         player = server.get_player_by_number(event['player'])
@@ -104,8 +107,8 @@ class SpeedyModule(module.ServerModule):
         # Relying on a user to mke them in every module event is error prone
         events.Events.spawn(self, event, _, thread_lock)
 
-        server = self.servers[event['port']]
-        if server.port !=  self.port: return
+        server = self.server_launcher.server_for_port(event['port'])
+        if server.port != self.port: return
 
         player = server.get_player_by_number(event['player'])
 

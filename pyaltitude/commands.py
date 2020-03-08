@@ -29,8 +29,6 @@ class Commands(object):
         self._send('listPlayers')
 
     def serverWhisper(self, player, message):
-        #once we pass in players check if it's a bort
-        # and don't whisper if it is
         if player.is_bot(): return
         self._send('serverWhisper', player.nickname.replace(' ', '\ '), message)
 

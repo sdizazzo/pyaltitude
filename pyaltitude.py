@@ -15,6 +15,9 @@ import concurrent.futures
 import ujson # faster than built-in but we have small data
              # not sure it justifies a requirement
 
+from inotify_simple import INotify, flags
+
+
 #TODO config module
 # paths are currently hardcoded in individual mods
 PATH = '/home/sean/altitude/servers/log.txt'
@@ -127,9 +130,18 @@ class Main(object):
         # parse config here and pass in
         # also determine which modules to load 
         # and pass in through to workers
-
-        tail_thread=threading.Thread(target=self.tail, daemon=True)
+        tail_thread = TailThread(PATH, self.queue)
         tail_thread.start()
+
+        if not self.queue.empty() and self.queue.get(timeout=0.5) == 99:
+            print()
+            print("Your system appears to be an older kernel that requires running a")
+            print("specific version of inotify_simple.  Please install it by running:")
+            print()
+            print("pip install inotify_simple==1.2.1")
+            print()
+            print("More info here: https://github.com/chrisjbillington/inotify_simple/issues/17")
+            return
 
 
         with concurrent.futures.ThreadPoolExecutor(min(32, os.cpu_count() + 4), thread_name_prefix='Worker') as pool:
@@ -159,26 +171,6 @@ class Main(object):
                 logger.exception('Worker raised exception: %s' % repr(e))
 
 
-    def tail(self, rollover=False):
-        if rollover:
-            logger.info("Tailing log file after rollover at %s" % PATH)
-        else:
-            logger.info('Begin tailing log file at %s' % PATH)
-
-        with open(PATH, 'rt') as f:
-            inode = os.fstat(f.fileno()).st_ino
-            while True:
-                line = f.readline()
-                if not line:
-                    if os.stat(PATH).st_ino != inode:
-                        break
-                    time.sleep(0.01)
-                    continue
-                self.queue.put((line, False))
-
-        self.tail(rollover=True)
-
-
     def parse_server_config(self):
         servers = dict()
 
@@ -198,7 +190,68 @@ class Main(object):
 
         #mapList = root.find('mapList')
         return server_launcher
+
  
+class TailThread(threading.Thread):
+    logger = logging.getLogger('pyaltitude.TailThread')
+
+    def __init__(self, path, queue):
+        self.path = path
+        self.queue = queue
+        self._buffer = ''
+
+
+        super(TailThread, self).__init__(daemon=True)
+
+
+    def run(self, rollover=False):
+        if rollover:
+            self.logger.info("Tailing log file after rollover at %s" % self.path)
+        else:
+            self.logger.info('Begin tailing log file at %s' % self.path)
+
+        with open(self.path, 'rt') as fh:
+            try:
+                inotify = INotify()
+            except IsADirectoryError as e:
+                #inotify_simple known issue
+                #https://github.com/chrisjbillington/inotify_simple/issues/17
+                self.logger.critical('inotify_simple version error on this kernel')
+                self.queue.put(99)
+                return
+
+
+            mask = flags.MODIFY | flags.MOVE_SELF
+            wd = inotify.add_watch(self.path, mask)
+
+            while True:
+                do_break = False
+                for event in inotify.read():
+                    for flag in flags.from_mask(event.mask):
+                        if flag is flags.MOVE_SELF:
+                            # rollover is happening
+                            self.logfile_modified(fh)
+                            do_break = True
+                        elif flag is flags.MODIFY:
+                            self.logfile_modified(fh)
+
+                if do_break: break
+
+        self.run(rollover=True)
+
+
+    def logfile_modified(self, fh):
+        self._buffer += fh.read()
+        events = self._buffer.split('\n')
+
+        if not events[-1].endswith('}'):
+            #its not a full event, put it back in the buffer
+            self._buffer = events[-1]
+            del events[-1]
+
+        for e in events:
+            self.queue.put((e, False))
+
 
 if __name__ == "__main__":
     

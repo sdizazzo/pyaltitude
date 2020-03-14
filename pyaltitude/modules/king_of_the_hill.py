@@ -129,9 +129,9 @@ class KOTH(module.MapModule):
     # Events
     #################
 
-    def serverInit(self, event, _, thread_lock):
-        events.Events.serverInit(self, event, _, thread_lock)
-        server = self.server_launcher.server_for_port(event['port'])
+    def serverInit(self, event):
+        events.Events.serverInit(self, event)
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.port == 27282:
             logger.info('Setting cameraViewScale to 120')
             server.testCameraViewScale(120)
@@ -143,9 +143,9 @@ class KOTH(module.MapModule):
     # to use the same events, I commented clientAdd out here
     # so it could be used in the Lobby module for now.
     """
-    def clientAdd(self, event, _, thread_lock):
-        events.Events.clientAdd(self, event, _, thread_lock)
-        server = self.servers[event['port']]
+    def clientAdd(self, event):
+        events.Events.clientAdd(self, event)
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.port != 27282: return
 
         player = server.get_player_by_number(event['player'])
@@ -162,7 +162,7 @@ class KOTH(module.MapModule):
     """
 
 
-    def mapChange(self, event, _, thread_lock):
+    def mapChange(self, event):
         # NOTE
         # When  you override an event in a module, you
         # need to call the basic mapChange first!!
@@ -171,27 +171,27 @@ class KOTH(module.MapModule):
         #
         # TODO This will get us closer to breaking
         # out the modules into types: server, game, map
-        events.Events.mapChange(self, event, _, thread_lock)
+        events.Events.mapChange(self, event)
 
-        server = self.server_launcher.server_for_port(event['port'])
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.port == 27282:
-            with thread_lock:
+            with self.thread_lock:
                 KOTH.flag_timer_event.set()
                 time.sleep(2)
                 self.reset(server)
 
 
-    def powerupAutoUse(self, event, _, thread_lock):
-        events.Events.powerupAutoUse(self, event, _, thread_lock)
+    def powerupAutoUse(self, event):
+        events.Events.powerupAutoUse(self, event)
 
-        server = self.server_launcher.server_for_port(event['port'])
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.map.name != self.map_name: return
         if event['powerup'] != 'Health' or (event['positionX'], event['positionY']) != (1501, 1735): return
         #THis is the right powerup
         player = server.get_player_by_number(event['player'])
         #if not player: return
         
-        with thread_lock:
+        with self.thread_lock:
             if not KOTH.flag_taken_by or KOTH.flag_taken_by.team != player.team:
                 #its an event we need to pay attention to
                 if KOTH.flag_timer_thread:

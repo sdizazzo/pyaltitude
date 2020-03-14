@@ -8,8 +8,6 @@ from . import base
 from . import enums
 
 
-map_dir = "/home/sean/altitude/maps"
-
 logger = logging.getLogger(__name__)
 
 class SpawnPoint(base.Base):
@@ -32,10 +30,11 @@ class SpawnPoint(base.Base):
 class Map(base.Base):
     logger = logging.getLogger('pyaltitude.Map')
 
-    def __init__(self, server, name):
+    def __init__(self, server, config, name):
         self.server = server
+        self.config = config
         self.name = name
-        self.path = os.path.join(map_dir, name+ '.altx')
+        self.path = os.path.join(self.config.map_dir, name+ '.altx')
 
         self.leftTeam = None
         self.rightTeam = None

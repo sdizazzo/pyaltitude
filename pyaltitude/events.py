@@ -22,36 +22,36 @@ class EST(tzinfo):
 
 class Events(object):
 
-    def sessionStart(self, event, INIT, thread_lock):
-        #{'date': '2020 Feb 22 04:01:43:847 EST', 'port': -1, 'time': 0,'type': 'sessionStart'}
+    def sessionStart(self, event):
+        #{'date': '2020 Feb 22 04:01:43:847 EST', 'port': -1, 'time': 0, 'type': 'sessionStart'}
         date_str = event['date'][:-8]
         date = datetime.strptime(date_str, "%Y %b %d %H:%M:%S").replace(tzinfo=EST())
         logger.info("Session officially starts at (Nimbly time): %s" % date)
-        for server in self.server_launcher.servers:
+        for server in self.config.server_launcher.servers:
             server.start = date
             server.time = 0
 
-    def serverInit(self, event, _, thread_lock):
+    def serverInit(self, event):
         pass
 
 
-    def clientAdd(self, event, INIT, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def clientAdd(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         player = Player(server)
         player = player.parse(event)
-        server.add_player(player, message =not INIT)
+        server.add_player(player)
 
 
-    def clientRemove(self, event, INIT, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def clientRemove(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
 
         # see https://github.com/sdizazzo/pyaltitude/issues/4
         player = server.get_player_by_vaporId(event['vaporId'])
-        server.remove_player(player, event['reason'], event['message'], message =not INIT)
+        server.remove_player(player, event['reason'], event['message'])
 
 
-    def spawn(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def spawn(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         #{'plane': 'Biplane', 'port': 27280, 'perkGreen': 'Heavy Armor',
         #'perkRed': 'Heavy Cannon', 'skin': 'No Skin', 'team': 4, 'time':
         #18018150, 'type': 'spawn', 'perkBlue': 'Ultracapacitor', 'player': 2}
@@ -59,48 +59,48 @@ class Events(object):
         player.spawned()
 
 
-    def logPlanePositions(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def logPlanePositions(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         server.map_player_positions(event)
 
 
-    def mapLoading(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def mapLoading(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         #{'port': 27279, 'time': 16501201, 'type': 'mapLoading', 'map':'ffa_core'}
         # THis event gives us the map name which is enough to
         # instatiate the map object and begin parsing the map 
         # file for what we need:
         #    * right now just the spawn points so we can reset to them
         #      after an /attach to a player
-        map_ = Map(server, event['map'])
+        map_ = Map(server, self.config, event['map'])
         map_.parse_alte()
         server.map = map_
 
 
-    def serverHitch(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def serverHitch(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         server.serverMessage('ServerHitch: %.2f' % event['duration'])
         logger.warning('ServerHitch: %.2f, %s' % (event['duration'], server.serverName))
 
 
-    def roundEnd(self, event, _, thread_lock):
+    def roundEnd(self, event):
         pass
 
 
-    def powerupUse(self, event, _, thread_lock):
+    def powerupUse(self, event):
         pass
 
 
-    def powerupAutoUse(self, event, _, thread_lock):
+    def powerupAutoUse(self, event):
         pass
 
 
-    def powerupPickup(self, event, _, thread_lock):
+    def powerupPickup(self, event):
         pass
 
 
-    def mapChange(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def mapChange(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         #{"mode":"ball","rightTeam":5,"port":27278,"leftTeam":6,"time":5808529,"type":"mapChange","map":"ball_cave"}
 
         wait = .5
@@ -117,16 +117,16 @@ class Events(object):
         server.map.state = MapState.ACTIVE
 
 
-    def playerInfoEv(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def playerInfoEv(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         if event['leaving']: return
 
         player = server.get_player_by_number(event['player'])
         player.parse_playerInfoEv(event)
 
 
-    def teamChange(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def teamChange(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         player = server.get_player_by_number(event['player'])
         player.team = event['team']
 
@@ -160,8 +160,8 @@ class Events(object):
         logger.info('%s attached to %s' % (from_player.nickname, to_player.nickname))
 
 
-    def consoleCommandExecute(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def consoleCommandExecute(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
 
         #
         # Custom commands - More shit to do!!!

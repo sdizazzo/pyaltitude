@@ -84,9 +84,9 @@ class SpeedyModule(module.ServerModule):
     TODO BUG!!! Inheriting the same event in multiple modules causes only the
     last to be honored.  Time for a refactor!  Opening an issue.
 
-    def clientAdd(self, event, _, thread_lock):
-        events.Events.clientAdd(self, event, _, thread_lock)
-        server = self.server_launcher.server_for_port(event['port'])
+    def clientAdd(self, event):
+        events.Events.clientAdd(self, event)
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.port !=  self.port: return
 
         player = server.get_player_by_number(event['player'])
@@ -101,13 +101,13 @@ class SpeedyModule(module.ServerModule):
             player.whisper("*********************************************************************")
     """
 
-    def spawn(self, event, _, thread_lock):
+    def spawn(self, event):
         # NOTE If the module classes are subclassed properly, I think
         # I can make these calls to the event super method automatic
         # Relying on a user to mke them in every module event is error prone
-        events.Events.spawn(self, event, _, thread_lock)
+        events.Events.spawn(self, event)
 
-        server = self.server_launcher.server_for_port(event['port'])
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.port != self.port: return
 
         player = server.get_player_by_number(event['player'])

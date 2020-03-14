@@ -1,0 +1,2 @@
+root: /home/sean/altitude/
+modules: [king_of_the_hill.KOTH, speedy.SpeedyModule, lobby.Lobby]

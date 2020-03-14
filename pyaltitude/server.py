@@ -7,9 +7,6 @@ from . import base
 from . import commands
 
 
-COMMAND_PATH = '/home/sean/altitude/servers/command.txt'
-
-
 MockMap = namedtuple('MockMap', ('state', 'name'), defaults = (None, None))
 
 logger = logging.getLogger(__name__)
@@ -30,7 +27,8 @@ class ServerLauncher(base.Base):
 
 class Server(base.Base, commands.Commands):
 
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         # check if player is admin when logging in, then set is_admin
         self.admin_vaporIds = list()
         self.players = list() # <--- on active map??
@@ -42,30 +40,27 @@ class Server(base.Base, commands.Commands):
 
         self.map = MockMap()
 
-
     def add_player(self, player, message=True):
         logger.info('Adding player %s to server %s' % (player.nickname, self.serverName))
         self.players.append(player)
-        self.players_changed(player, True, message=message)
+        self.players_changed(player, True)
         #logger.debug(player.describe())
 
 
-    def remove_player(self, player, reason, explain, message=True):
+    def remove_player(self, player, reason, explain):
         logger.info('Removing player %s from server %s, Reason: %s, Explain: %s' % (player.nickname, self.serverName, reason, explain))
         self.players.remove(player)
-        self.players_changed(player, False, message=message)
+        self.players_changed(player, False)
 
 
-    def players_changed(self, player, added, message=True):
+    def players_changed(self, player, added):
         if not player.is_bot():
             if added:
                 player.whisper('Hey %s!' % player.nickname)
                 player.whisper('Welcome to %s!' % self.serverName)
-
-            player_count = len(self.get_players())
-
-            if message:
+                player_count = len(self.get_players())
                 self.serverMessage('%s players now in server' % player_count)
+
             logger.info("Players now in %s: %s" % (self.serverName, [p.nickname for p in self.get_players()]))
 
 
@@ -155,6 +150,6 @@ class Server(base.Base, commands.Commands):
         #convert_types since we are reading from the xml file
         super().parse(attrs, convert_types=True)
         logger.info('Initialilzed server: %s on port %s' % (self.serverName, self.port))
-        commands.Commands.__init__(self)
+        commands.Commands.__init__(self, self.config)
         return self
  

@@ -6,8 +6,8 @@ class BallFlipGravityModule(module.MapModule):
         self.map = map
         super().__init__(self, map)
 
-    def powerupPickup(self, event, _thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def powerupPickup(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         #
         # HACK!!!!!!!!!!!!!!!!!!!!!!!!
         #
@@ -21,8 +21,8 @@ class BallFlipGravityModule(module.MapModule):
         #server.serverMessage('Ball is held...Gravity has been disrupted!')
 
 
-    def powerupUse(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def powerupUse(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.map.name !=  self.map: return
         if event['powerup'] != 'Ball': return
 

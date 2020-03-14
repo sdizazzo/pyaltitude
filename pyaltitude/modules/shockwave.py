@@ -13,7 +13,7 @@ class ShockWaveModule(module.GameModeModule):
         super().__init__(self, mode)
 
 
-    def kill(self, event, _, thread_lock):
+    def kill(self, event):
         #{"victimPositionY":407.63,"victimVelocityX":1.17,"streak":3,"source":"plane","type":"kill","victimPositionX":1395.17,"victimVelocityY":2.63,"multi":3,"port":27278,"xp":10,"victim":0,"time":12800875,"player":11}
         def jiggle(multi, team):
             if not team: return
@@ -28,7 +28,7 @@ class ShockWaveModule(module.GameModeModule):
                 #time.sleep(.1)
                 #player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
-        server = self.server_launcher.server_for_port(event['port'])
+        server = self.config.server_launcher.server_for_port(event['port'])
         if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
 
@@ -42,7 +42,7 @@ class ShockWaveModule(module.GameModeModule):
             else:
                 jiggle(event['multi'], teams.get('leftTeam'))
 
-    def structureDamage(self, event, _, thread_lock):
+    def structureDamage(self, event):
         def jiggle(team):
             if not team: return
 
@@ -55,7 +55,7 @@ class ShockWaveModule(module.GameModeModule):
                 time.sleep(.2)
                 player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
-        server = self.server_launcher.server_for_port(event['port'])
+        server = self.config.server_launcher.server_for_port(event['port'])
         if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
         # for testing
@@ -70,7 +70,7 @@ class ShockWaveModule(module.GameModeModule):
             else:
                 jiggle(teams.get('leftTeam'))
 
-    def structureDestroy(self, event, _, thread_lock):
+    def structureDestroy(self, event):
         def jiggle(team):
             for player in team:
                 if not player.is_bot():
@@ -80,7 +80,7 @@ class ShockWaveModule(module.GameModeModule):
                 player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
         
-        server = self.server_launcher.server_for_port(event['port'])
+        server = self.config.server_launcher.server_for_port(event['port'])
         if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
         

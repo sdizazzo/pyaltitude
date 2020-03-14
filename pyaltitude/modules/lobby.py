@@ -93,10 +93,10 @@ class Lobby(module.ServerModule):
 
 
             if dest_port and not sent:
-                dest_server = server.launcher.server_for_port(dest_port)
+                dest_server = self.config.server_launcher.server_for_port(dest_port)
                 logger.info("Sending %s to server %s" % (player.nickname, dest_server.serverName))
                 server.serverMessage('%s is entering %s' % (player.nickname, dest_server.serverName))
-                server.serverRequestPlayerChangeServer(player, server.launcher.ip, dest_port, secret_code=None)
+                server.serverRequestPlayerChangeServer(player, self.config.server_launcher.ip, dest_port, secret_code=None)
                 ts = time.time()
                 sent = True
 
@@ -116,9 +116,9 @@ class Lobby(module.ServerModule):
     #################
 
 
-    def clientAdd(self, event, _, thread_lock):
-        events.Events.clientAdd(self, event, _, thread_lock)
-        server = self.server_launcher.server_for_port(event['port'])
+    def clientAdd(self, event):
+        events.Events.clientAdd(self, event)
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.port != self.port: return
 
         player = server.get_player_by_number(event['player'])
@@ -127,13 +127,13 @@ class Lobby(module.ServerModule):
         player.game_thread.start()
 
 
-    def clientRemove(self, event, _, thread_lock):
-        server = self.server_launcher.server_for_port(event['port'])
+    def clientRemove(self, event):
+        server = self.config.server_launcher.server_for_port(event['port'])
         if server.port == self.port:
             player = server.get_player_by_number(event['player'])
             player.game_event.set()
             player.game_thread = None
 
         #HAVE TO STOP THE EVENT BEFORE WE REMOVE THE PLAYER!!
-        events.Events.clientRemove(self, event, _, thread_lock)
+        events.Events.clientRemove(self, event)
 

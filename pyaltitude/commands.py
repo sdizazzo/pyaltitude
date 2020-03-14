@@ -2,13 +2,14 @@
 
 import subprocess, logging
 
+
 logger = logging.getLogger(__name__)
+
 
 class Commands(object):
 
-    def __init__(self):
-        self.command_path = '/home/sean/altitude/servers/command.txt'
-        #get the path from the config
+    def __init__(self, config):
+        self.command_path = config.command_path
         self.cmd = "%s,console," % self.port
 
         #NOTE You can also send a `27283,restart` command, or perhaps

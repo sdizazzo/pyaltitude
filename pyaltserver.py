@@ -7,82 +7,26 @@ import logging
 import threading
 
 from logging.handlers import RotatingFileHandler
-from functools import partial
 
 import xml.etree.ElementTree as ET
 import concurrent.futures
 
-import ujson # faster than built-in but we have small data
-             # not sure it justifies a requirement
-
-from inotify_simple import INotify, flags
-
-
 from pyaltitude.config import Config
-from pyaltitude.events import Events
-from pyaltitude.modules import *
+from pyaltitude.worker import Worker
 #from pyaltitude.custom_commands import attach
 
+from inotify_simple import INotify, flags
+import ujson
 
 logger = logging.getLogger('pyaltitude')
-
-
-
-class Worker(Events):
-    logger = logging.getLogger('pyaltitude.Worker')
-
-    def __init__(self, line, config, thread_lock):
-        self.line = line
-        self.config = config
-        self.thread_lock = thread_lock
-
-
-    def get_module_events(self, module):
-        events = list()
-        for func in dir(module):
-            if callable(getattr(module, func)) and not func.startswith('__'):
-                events.append(func)
-        return events
-
-
-    def execute(self):
-        #####
-        #NOTE HACK!!!!!!!!!!!!!!!!!!!!!!!!
-
-        # NEED LOAD MODULE AND UNLOAD MODULES BASED ON GAME MODE OR MAP OR
-        # SERVER
-        # 
-        # Will do for all (server?) modules
-        modules = (king_of_the_hill.KOTH, speedy.SpeedyModule, lobby.Lobby)
-        for module in modules:
-            module.config = self.config
-            module.thread_lock = self.thread_lock
-            for func_name in self.get_module_events(module()):
-                func = getattr(module(), func_name)
-                setattr(self, func_name, func)
-
-        try:
-            event = ujson.loads(self.line)
-        except ValueError:
-            self.logger.error("Worker could not parse log line: %s" % self.line)
-            raise
-
-        try:
-            self.logger.debug("Processing event %s" % event)
-            method = getattr(self, event['type'])
-        except AttributeError as e:
-            self.logger.debug(repr(NotImplementedError(event['type'])))
-            return
-        
-        method(event)
 
 
 
 class TailThread(threading.Thread):
     logger = logging.getLogger('pyaltitude.TailThread')
 
-    def __init__(self, path, queue):
-        self.path = path
+    def __init__(self, config, queue):
+        self.config = config
         self.queue = queue
         self._buffer = ''
 
@@ -91,11 +35,11 @@ class TailThread(threading.Thread):
 
     def run(self, rollover=False):
         if rollover:
-            self.logger.info("Tailing log file after rollover at %s" % self.path)
+            self.logger.info("Tailing log file after rollover at %s" % self.config.log_path)
         else:
-            self.logger.info('Begin tailing log file at %s' % self.path)
+            self.logger.info('Begin tailing log file at %s' % self.config.log_path)
 
-        with open(self.path, 'rt') as fh:
+        with open(self.config.log_path, 'rt') as fh:
             try:
                 inotify = INotify()
             except IsADirectoryError as e:
@@ -107,7 +51,7 @@ class TailThread(threading.Thread):
 
 
             mask = flags.MODIFY | flags.MOVE_SELF
-            wd = inotify.add_watch(self.path, mask)
+            wd = inotify.add_watch(self.config.log_path, mask)
 
             while True:
                 do_break = False
@@ -134,8 +78,24 @@ class TailThread(threading.Thread):
             self._buffer = events[-1]
             del events[-1]
 
-        for e in events:
-            self.queue.put(e)
+        for event in events:
+            self.parse_event(event)
+
+    def parse_event(self, event):
+        try:
+            event = ujson.loads(event)
+            self.route_event(event)
+        except ValueError:
+            self.logger.error("Could not parse log line: %s" % event)
+            raise
+
+    def route_event(self, event):
+        if event['port'] == -1:
+            #the default thread pool
+            self.queue.put(event)
+        else:
+            server = self.config.server_launcher.server_for_port(event['port'])
+            server.queue.put(event)
 
 
 
@@ -177,7 +137,7 @@ class Main(object):
         # parse config here and pass in
         # also determine which modules to load 
         # and pass in through to workers
-        tail_thread = TailThread(self.config.log_path, self.queue)
+        tail_thread = TailThread(self.config, self.queue)
         tail_thread.start()
 
         if not self.queue.empty() and self.queue.get(timeout=0.5) == 99:
@@ -191,10 +151,16 @@ class Main(object):
             return
 
 
-        with concurrent.futures.ThreadPoolExecutor(min(32, os.cpu_count() + 4), thread_name_prefix='Worker') as pool:
+        # one threadpool here for queueing events from the log.txt
+        # make this a mixin??
+
+        # TODO How to split up the threads between the default and each server
+        # thread pool?  Or should they all have 32?
+        total_threads = min(32, os.cpu_count() + 4)
+        with concurrent.futures.ThreadPoolExecutor(5, thread_name_prefix='Worker') as pool:
             # one NOTE is that I dont want to have to load modules
             # on every event worry about that later
-            logger.info('Initialized thread pool')
+            logger.info('Initialized default thread pool')
             while True:
                 try:
                     line = self.queue.get()

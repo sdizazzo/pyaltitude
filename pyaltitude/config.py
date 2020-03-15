@@ -17,15 +17,20 @@ class Config(object):
 
     def __init__(self, conf):
         self.conf_path = os.path.abspath(conf)
-
+        logger.info('Reading config file: %s' % self.conf_path)
         with open(self.conf_path, 'rt') as fi: 
             filecnf = yaml.safe_load(fi)
 
         self.root = filecnf['root']
+        logger.info('Set Altitude root: %s' % self.root)
         self.log_path = os.path.join(self.root, 'servers', 'log.txt')
+        logger.info("Set log.txt: %s" % self.log_path)
         self.command_path = os.path.join(self.root, 'servers', 'command.txt')
+        logger.info("Set command.txt: %s" % self.command_path)
         self.launcher_path = os.path.join(self.root, 'servers', 'launcher_config.xml')
+        logger.info("Set launcher_config.xml: %s" % self.launcher_path)
         self.map_dir = os.path.join(self.root, 'maps')
+        logger.info("Set map directory: %s" % self.map_dir)
         
         self.modules = filecnf['modules']
 

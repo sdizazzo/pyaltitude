@@ -1,15 +1,28 @@
 import uuid, time
 import math
-import subprocess, logging
+import queue
+import logging
+from threading import Lock, Thread
 from collections import namedtuple
+
+import concurrent.futures
 
 from . import base
 from . import commands
 
+from pyaltitude.worker import Worker
+
+
+logger = logging.getLogger(__name__)
 
 MockMap = namedtuple('MockMap', ('state', 'name'), defaults = (None, None))
 
-logger = logging.getLogger(__name__)
+
+class ServerNameAdapter(logging.LoggerAdapter):
+    # Add the serverName attribute to certain log entries
+    def process(self, msg, kwargs):
+        return '%s - %s' % (self.extra['server'], msg), kwargs
+
 
 class ServerLauncher(base.Base):
     servers = list()
@@ -29,6 +42,9 @@ class Server(base.Base, commands.Commands):
 
     def __init__(self, config):
         self.config = config
+        self.queue = queue.Queue()
+        self.thread_lock = Lock()
+
         # check if player is admin when logging in, then set is_admin
         self.admin_vaporIds = list()
         self.players = list() # <--- on active map??
@@ -39,6 +55,37 @@ class Server(base.Base, commands.Commands):
         self.mapRotationList = list()
 
         self.map = MockMap()
+
+
+    def worker_done_cb(self, fut):
+        exception = fut.exception()
+        if exception:
+            try:
+                fut.result()
+            except Exception as e:
+                self.log_serverName.exception('Worker raised exception: %s' % repr(e))
+
+
+    def run_thread_pool(self, workers):
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+
+        #Pass in the modules we want to load
+        while True:
+            line = self.queue.get()
+            worker = Worker(line, self.config, self.thread_lock)
+            future = pool.submit(worker.execute)
+            future.add_done_callback(self.worker_done_cb)
+            time.sleep(.01)
+
+        pool.shutdown(wait=False)
+
+
+    def run_thread_pool_thread(self, workers):
+        #LOLOLOL
+        logger.info('Initialized thread pool for server: %s with %s workers' % (self.serverName, workers))
+        self.thread_pool_thread = Thread(target=self.run_thread_pool, args=(workers, ), daemon=True)
+        self.thread_pool_thread.start()
+
 
     def add_player(self, player, message=True):
         logger.info('Adding player %s to server %s' % (player.nickname, self.serverName))
@@ -93,7 +140,7 @@ class Server(base.Base, commands.Commands):
                 # with the same tick.
                 # I guess I'm sending too many requests...?
                 if now == player.time:
-                    logger.warning("Skipping velocity event for %s as time had not changed.  Time: %s" %  (player.nickname, now))
+                    self.log_serverName.warning("Skipping velocity event for %s as time had not changed.  Time: %s" %  (player.nickname, now))
                     #NOTE@@
                     # is this lag??
                     # Can I get the ping and report it when this happens?
@@ -150,6 +197,10 @@ class Server(base.Base, commands.Commands):
         #convert_types since we are reading from the xml file
         super().parse(attrs, convert_types=True)
         logger.info('Initialilzed server: %s on port %s' % (self.serverName, self.port))
+        self.log_serverName = ServerNameAdapter(logger, {'server': self.serverName})
+        # TODO
+        # get the number of workers fromo the config file!
+        self.run_thread_pool_thread(5)
         commands.Commands.__init__(self, self.config)
         return self
  

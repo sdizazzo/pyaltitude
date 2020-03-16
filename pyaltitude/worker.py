@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 #        return '%s - %s' % (self.extra['classPath'], msg), kwargs
 
 class Worker(Events):
-    #log_classPath = ClassPathAdapter(logger, {'classPath':inspect.stack()[1][3]})
+    #log_classPath = ClassPathAdapter(logger,{'classPath':inspect.currentframe().f_back.f_code.co_name})
 
     def __init__(self, event, config, thread_lock):
         self.event = event

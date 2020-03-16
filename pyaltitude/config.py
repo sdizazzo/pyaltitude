@@ -56,3 +56,11 @@ class Config(object):
         #mapList = root.find('mapList')
         return server_launcher  
 
+
+    ####################
+    # helper methods
+    ####################
+
+    def get_server(self, port):
+        return self.server_launcher.server_for_port(port)
+

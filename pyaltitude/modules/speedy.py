@@ -86,7 +86,7 @@ class SpeedyModule(module.ServerModule):
 
     def clientAdd(self, event):
         events.Events.clientAdd(self, event)
-        server = self.config.server_launcher.server_for_port(event['port'])
+        server = self.config.get_server(event['port'])
         if server.port !=  self.port: return
 
         player = server.get_player_by_number(event['player'])
@@ -107,7 +107,7 @@ class SpeedyModule(module.ServerModule):
         # Relying on a user to mke them in every module event is error prone
         events.Events.spawn(self, event)
 
-        server = self.config.server_launcher.server_for_port(event['port'])
+        server = self.config.get_server(event['port'])
         if server.port != self.port: return
 
         player = server.get_player_by_number(event['player'])

@@ -90,13 +90,13 @@ class TailThread(threading.Thread):
             raise
 
     def route_event(self, event):
-        if event['port'] == -1:
-            #the default thread pool
-            self.queue.put(event)
-        else:
-            server = self.config.server_launcher.server_for_port(event['port'])
+        if event['port'] != -1:
+            #send to the execute on the thread pool on the specific server
+            server = self.config.get_server(event['port'])
             server.queue.put(event)
-
+        else:
+            #execute on the default thread
+            self.queue.put(event)
 
 
 class Main(object):
@@ -151,40 +151,17 @@ class Main(object):
             return
 
 
-        # one threadpool here for queueing events from the log.txt
-        # make this a mixin??
-
-        # TODO How to split up the threads between the default and each server
-        # thread pool?  Or should they all have 32?
-        total_threads = min(32, os.cpu_count() + 4)
-        with concurrent.futures.ThreadPoolExecutor(5, thread_name_prefix='Worker') as pool:
-            # one NOTE is that I dont want to have to load modules
-            # on every event worry about that later
-            logger.info('Initialized default thread pool')
-            while True:
-                try:
-                    line = self.queue.get()
-                    worker = Worker(line, self.config, self.thread_lock)
-                    future = pool.submit(worker.execute)
-                    future.add_done_callback(self.worker_done_cb)
-                    #queue.get() blocks.  we dont need a sleep
-                    #wrong...it definitely affects portals.  look deeper
-                    time.sleep(.01)
-                except KeyboardInterrupt:
-                    logger.info('Done.')
-                    break
-
-
-    def worker_done_cb(self, fut):
-        exception = fut.exception()
-        if exception:
+        logger.info('Waiting for events on main thread')
+        while True:
             try:
-                # get the result so we raise the exception
-                # and get the traceback
-                fut.result()
-            except Exception as e:
-                logger.exception('Worker raised exception: %s' % repr(e))
-
+                line = self.queue.get()
+                worker = Worker(line, self.config, self.thread_lock)
+                worker.execute()
+                time.sleep(.1)
+            except KeyboardInterrupt:
+                logger.info('Done.')
+                break
+                
 
 if __name__ == "__main__":
     from datetime import datetime

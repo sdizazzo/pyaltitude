@@ -93,7 +93,7 @@ class Lobby(module.ServerModule):
 
 
             if dest_port and not sent:
-                dest_server = self.config.server_launcher.server_for_port(dest_port)
+                dest_server = self.config.get_server(dest_port)
                 logger.info("Sending %s to server %s" % (player.nickname, dest_server.serverName))
                 server.serverMessage('%s is entering %s' % (player.nickname, dest_server.serverName))
                 server.serverRequestPlayerChangeServer(player, self.config.server_launcher.ip, dest_port, secret_code=None)
@@ -118,7 +118,7 @@ class Lobby(module.ServerModule):
 
     def clientAdd(self, event):
         events.Events.clientAdd(self, event)
-        server = self.config.server_launcher.server_for_port(event['port'])
+        server = self.config.get_server(event['port'])
         if server.port != self.port: return
 
         player = server.get_player_by_number(event['player'])
@@ -128,7 +128,7 @@ class Lobby(module.ServerModule):
 
 
     def clientRemove(self, event):
-        server = self.config.server_launcher.server_for_port(event['port'])
+        server = self.config.get_server(event['port'])
         if server.port == self.port:
             player = server.get_player_by_number(event['player'])
             player.game_event.set()

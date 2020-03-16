@@ -28,7 +28,7 @@ class ShockWaveModule(module.GameModeModule):
                 #time.sleep(.1)
                 #player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
-        server = self.config.server_launcher.server_for_port(event['port'])
+        server = self.config.get_server(event['port'])
         if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
 
@@ -55,7 +55,7 @@ class ShockWaveModule(module.GameModeModule):
                 time.sleep(.2)
                 player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
-        server = self.config.server_launcher.server_for_port(event['port'])
+        server = self.config.get_server(event['port'])
         if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
         # for testing
@@ -80,7 +80,7 @@ class ShockWaveModule(module.GameModeModule):
                 player.applyForce(random.randrange(-8,8),random.randrange(-8,8))
 
         
-        server = self.config.server_launcher.server_for_port(event['port'])
+        server = self.config.get_server(event['port'])
         if not server.port in (27279, 27280): return
         if not server.map.state.ACTIVE: return
         

@@ -127,9 +127,6 @@ class Main(object):
 
         self.config = Config(conf)
         self.queue = queue.Queue()
-        # Im really questioning if we need the thread lock
-        # I at least moved it out of the events so it's hardly noticeable
-        self.thread_lock = threading.Lock()
 
         ##################
         # NOTE
@@ -155,7 +152,7 @@ class Main(object):
         while True:
             try:
                 line = self.queue.get()
-                worker = Worker(line, self.config, self.thread_lock)
+                worker = Worker(line, self.config)
                 worker.execute()
                 time.sleep(.1)
             except KeyboardInterrupt:

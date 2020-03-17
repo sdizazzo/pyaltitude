@@ -2,6 +2,8 @@ import uuid, time
 import math
 import queue
 import logging
+import importlib
+
 from threading import Lock, Thread
 from collections import namedtuple
 
@@ -56,6 +58,11 @@ class Server(base.Base, commands.Commands):
 
         self.map = MockMap()
 
+        # set dynamically from yaml file
+        # see config_from_yaml() passed from config.py
+        self.workers = 1
+        self.modules = None
+
 
     def worker_done_cb(self, fut):
         exception = fut.exception()
@@ -66,13 +73,11 @@ class Server(base.Base, commands.Commands):
                 self.log_serverName.exception('Worker raised exception: %s' % repr(e))
 
 
-    def run_thread_pool(self, workers):
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
-
-        #Pass in the modules we want to load
+    def run_thread_pool(self):
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=self.workers)
         while True:
             line = self.queue.get()
-            worker = Worker(line, self.config, self.thread_lock)
+            worker = Worker(line, self.config, modules=self.modules, thread_lock=self.thread_lock)
             future = pool.submit(worker.execute)
             future.add_done_callback(self.worker_done_cb)
             time.sleep(.01)
@@ -80,10 +85,10 @@ class Server(base.Base, commands.Commands):
         pool.shutdown(wait=False)
 
 
-    def run_thread_pool_thread(self, workers):
+    def run_thread_pool_thread(self):
         #LOLOLOL
-        logger.info('Initialized thread pool for server: %s with %s workers' % (self.serverName, workers))
-        self.thread_pool_thread = Thread(target=self.run_thread_pool, args=(workers, ), daemon=True)
+        logger.info('Initialized thread pool for server: %s with %s workers' % (self.serverName, self.workers))
+        self.thread_pool_thread = Thread(target=self.run_thread_pool, daemon=True)
         self.thread_pool_thread.start()
 
 
@@ -181,8 +186,6 @@ class Server(base.Base, commands.Commands):
 
     def get_player_by_number(self, number, bots=True):
         for p in self.get_players(bots=bots):
-            #print(p.describe())
-
             if p.player == number:
                 return p
 
@@ -193,14 +196,28 @@ class Server(base.Base, commands.Commands):
                 return p
 
 
+    def config_from_yaml(self, conf):
+        for k, v in conf.items():
+            if k and k == 'modules':
+                mods = list()
+                if v:
+                    for module in v:
+                        #import the server modules
+                        mod_name, mod_class = module.split('.')
+                        mod = importlib.import_module('.modules.'+ mod_name, package='pyaltitude')
+                        klass = getattr(mod, mod_class)
+                        mods.append(klass)
+                    v = mods
+            if v:
+                self.log_serverName.info("Setting server attr from yaml config: %s => %s" % (k, v))
+                setattr(self, k, v)
+
+
     def parse(self, attrs):
         #convert_types since we are reading from the xml file
         super().parse(attrs, convert_types=True)
         logger.info('Initialilzed server: %s on port %s' % (self.serverName, self.port))
         self.log_serverName = ServerNameAdapter(logger, {'server': self.serverName})
-        # TODO
-        # get the number of workers fromo the config file!
-        self.run_thread_pool_thread(5)
         commands.Commands.__init__(self, self.config)
         return self
  

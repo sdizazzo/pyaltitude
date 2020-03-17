@@ -4,7 +4,6 @@ import logging
 #import inspect
 
 from pyaltitude.events import Events
-from pyaltitude.modules import *
 
 
 logger = logging.getLogger(__name__)
@@ -19,9 +18,10 @@ logger = logging.getLogger(__name__)
 class Worker(Events):
     #log_classPath = ClassPathAdapter(logger,{'classPath':inspect.currentframe().f_back.f_code.co_name})
 
-    def __init__(self, event, config, thread_lock):
+    def __init__(self, event, config, modules=None, thread_lock=None):
         self.event = event
         self.config = config
+        self.modules = modules
         self.thread_lock = thread_lock
 
 
@@ -34,26 +34,14 @@ class Worker(Events):
 
 
     def execute(self):
-        #####
-        #NOTE HACK!!!!!!!!!!!!!!!!!!!!!!!!
+        if self.modules:
+            for module in self.modules:
+                module.config = self.config
+                module.thread_lock = self.thread_lock
+                for func_name in self.get_module_events(module()):
+                    func = getattr(module(), func_name)
+                    setattr(self, func_name, func)
 
-        # NEED LOAD MODULE AND UNLOAD MODULES BASED ON GAME MODE OR MAP OR
-        # SERVER
-        # 
-        # Will do for all (server?) modules
-        modules = (king_of_the_hill.KOTH, speedy.SpeedyModule, lobby.Lobby)
-        for module in modules:
-            module.config = self.config
-            module.thread_lock = self.thread_lock
-            for func_name in self.get_module_events(module()):
-                func = getattr(module(), func_name)
-                setattr(self, func_name, func)
-
-        #try:
-        #    event = ujson.loads(self.line)
-        #except ValueError:
-        #    logger.error("Worker could not parse log line: %s" % self.line)
-        #    raise
 
         try:
             logger.debug("Processing event %s" % self.event)
@@ -63,3 +51,4 @@ class Worker(Events):
             return
 
         method(self.event)
+

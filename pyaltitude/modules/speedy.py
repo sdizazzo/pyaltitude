@@ -80,9 +80,6 @@ class SpeedyModule(module.ServerModule):
 
         logger.debug('Speedy thread stopped')
 
-    """
-    TODO BUG!!! Inheriting the same event in multiple modules causes only the
-    last to be honored.  Time for a refactor!  Opening an issue.
 
     def clientAdd(self, event):
         events.Events.clientAdd(self, event)
@@ -99,7 +96,7 @@ class SpeedyModule(module.ServerModule):
             player.whisper("Highly experimental, but kind of neat.")
             player.whisper("Arriba Arriba!  Andale Arriba!  Yeppa!!")
             player.whisper("*********************************************************************")
-    """
+
 
     def spawn(self, event):
         # NOTE If the module classes are subclassed properly, I think

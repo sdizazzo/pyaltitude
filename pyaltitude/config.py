@@ -31,10 +31,26 @@ class Config(object):
         logger.info("Set launcher_config.xml: %s" % self.launcher_path)
         self.map_dir = os.path.join(self.root, 'maps')
         logger.info("Set map directory: %s" % self.map_dir)
-        
-        self.modules = filecnf['modules']
 
         self.server_launcher = self._parse_launcher_config()
+
+        server_conf = filecnf['servers']
+        self.config_servers(server_conf)
+
+        # It doesn't seem right to start the servers from a "config" layer
+        # perhaps its named wrong, or I have it layed out wrong
+        self.start_server_thread_pools()
+
+
+    def start_server_thread_pools(self):
+        for server in self.server_launcher.servers:
+            server.run_thread_pool_thread()
+
+
+    def config_servers(self, server_conf):
+        for sconf in server_conf:
+            server = self.get_server(sconf['port'])
+            server.config_from_yaml(sconf)
 
 
     def _parse_launcher_config(self):
@@ -51,6 +67,7 @@ class Config(object):
         for server_config in root.iter("AltitudeServerConfig"):
             server = Server(config=self)
             server = server.parse(server_config.attrib)
+
             server_launcher.servers.append(server)
 
         #mapList = root.find('mapList')

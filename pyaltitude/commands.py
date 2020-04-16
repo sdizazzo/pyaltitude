@@ -62,5 +62,5 @@ class Commands(object):
 
     def serverRequestPlayerChangeServer(self, player, ip, port, secret_code=None):
         ip = ip +':'+str(port)
-        self._send('serverRequestPlayerChangeServer', player.nickname.replace(' ', '\ '), ip, secret_code)
+        self._send('serverRequestPlayerChangeServer', player.nickname.replace(' ', '\ '), ip, secret_code or 'null')
 

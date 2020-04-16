@@ -129,20 +129,20 @@ class KOTH(module.MapModule):
     # Events
     #################
 
+
     def serverInit(self, event):
         events.Events.serverInit(self, event)
         server = self.config.get_server(event['port'])
-        if server.port == 27282:
-            logger.info('Setting cameraViewScale to 120')
-            server.testCameraViewScale(120)
-            logger.info('Setting gravityMode to 3')
-            server.testGravityMode(3)
+        logger.info('Setting cameraViewScale to 120')
+        server.testCameraViewScale(120)
+        logger.info('Setting gravityMode to 3')
+        server.testGravityMode(3)
 
 
     def clientAdd(self, event):
         events.Events.clientAdd(self, event)
         server = self.config.get_server(event['port'])
-        if server.port != 27282: return
+        #if server.port != 27282: return
 
         player = server.get_player_by_number(event['player'])
         if not player.is_bot():

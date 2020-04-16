@@ -25,8 +25,9 @@ class Player(base.Base):
         #{"powerup":"Ball","positionY":158.65,"port":27278,"velocityX":-4.41,"time":1054454,"type":"powerupUse","velocityY":3.65,"player":4,"positionX":1191.59}
         self.powerup = None
 
-        self.game_thread = None
-        self.game_event = Event()
+        #if we are going to serialize players, we can't have threads on them!
+        #self.game_thread = None
+        #self.game_event = Event()
 
 
     def parse(self, json):

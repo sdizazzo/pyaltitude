@@ -12,7 +12,19 @@ logger = logging.getLogger(__name__)
 
 """
 
-Status: In development
+Status: Dropped
+
+1)  There is an issue with the serverChangeServer command where it doesn't
+always work as expected.  I debugged my code and the server logs, and it
+appears that the command is sent to the client,but the client doesn't always
+obey.
+
+2)  Like mentioned below, if nobody sees that there are people in the servers,
+nobody joins.  
+
+Perhaps it will be useful to somebody down the road.
+
+
 
 The idea behind this module is to make one server that shows up in the server
 list that is the main lobby with portals that link to other hidden servers on
@@ -37,11 +49,12 @@ servers.  They look at how mnay people are playing and then join them.
 
 # Make it work!
 
+
 class Lobby(module.ServerModule):
+    players = dict()
 
     def __init__(self, port=27284):
         self.port = port
-
         super().__init__(self, port)
 
 
@@ -61,14 +74,14 @@ class Lobby(module.ServerModule):
             return False
 
 
-    def portal_runner(self, server, player):
-        logger.info('Portal thread started')
-        WAIT = .1
+    def portal_runner(self, server, player, event):
+        logger.info('Portal thread started for %s' % player.nickname)
+        WAIT = .01
         sent = False
         dest_port = None
         ts = 0
         while True:
-            if player.game_event.is_set():
+            if event.is_set():
                 break
 
             #Speed ball
@@ -97,42 +110,55 @@ class Lobby(module.ServerModule):
                 logger.info("Sending %s to server %s" % (player.nickname, dest_server.serverName))
                 server.serverMessage('%s is entering %s' % (player.nickname, dest_server.serverName))
                 server.serverRequestPlayerChangeServer(player, self.config.server_launcher.ip, dest_port, secret_code=None)
-                ts = time.time()
                 sent = True
-
-            #need to retry this in case of packet loss
-            # TODO It doesn't seem to help, though...
-            if sent and time.time() - ts > 2:
-                sent = False
-
+                #Instead of stopping the thread here, we should count on the
+                #clientRemove event coming to stop the thread
+                #self.players[player][1].set()
+                
             time.sleep(WAIT)
 
-        logger.info('Portal thread ended.')
-        player.game_event.clear()
+        logger.info('Portal thread ended for player: %s' % player.nickname)
 
 
     #################
     # Events
     #################
 
+    def serverInit(self, event):
+        events.Events.serverInit(self, event)
+        server = self.config.get_server(event['port'])
+        logger.info('Setting cameraViewScale to 120')
+        server.testCameraViewScale(120)
+        logger.info('Setting gravityMode to 3')
+        server.testGravityMode(3)
+
 
     def clientAdd(self, event):
         events.Events.clientAdd(self, event)
         server = self.config.get_server(event['port'])
-        if server.port != self.port: return
 
         player = server.get_player_by_number(event['player'])
 
-        player.game_thread = Thread(target=self.portal_runner, args=(server, player) , daemon=True)
-        player.game_thread.start()
+        event = Event()
+        player_thread = Thread(target=self.portal_runner, args=(server, player, event) ,daemon=True)
+        #with self.thread_lock:
+        Lobby.players[player.vaporId] = (player_thread, event)
+        player_thread.start()
+
+        for serv in self.config.server_launcher.servers:
+            if server != serv:
+                player.whisper('%s players currently in %s' % (len(serv.get_players()), serv.serverName))
 
 
     def clientRemove(self, event):
         server = self.config.get_server(event['port'])
         if server.port == self.port:
             player = server.get_player_by_number(event['player'])
-            player.game_event.set()
-            player.game_thread = None
+            #with self.thread_lock:
+            thread, player_event = Lobby.players[player.vaporId]
+            player_event.set()
+            #with self.thread_lock:
+            del Lobby.players[player.vaporId]
 
         #HAVE TO STOP THE EVENT BEFORE WE REMOVE THE PLAYER!!
         events.Events.clientRemove(self, event)

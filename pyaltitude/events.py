@@ -109,9 +109,12 @@ class Events(object):
             #self.log_classPath.warning('mapChange: Sleeping waiting for map to become available: %s' % server.map.name)
             logger.warning('mapChange: Sleeping waiting for map to become available: %s' % server.map.name)
             t+=wait
-            if t >= 2:
-                logger.warning('mapChange: Took over 2 seconds to parse map.  Continued anyway...')
-                break
+            if t >= 10:
+                #Cant conttnue here because the MockMap isn't initialized so
+                #server.map.parse() will fail
+                #TODO Not sure how to handle this properly yet
+                logger.critical('****** mapChange: Took over 10 seconds to parse map. *******')
+                return
 
         server.map.parse(event)
         server.map.state = MapState.ACTIVE

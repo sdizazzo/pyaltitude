@@ -20,7 +20,7 @@ class SpawnPoint(base.Base):
     #it's not really json...
     def parse(self, json):
         self._json = json
-        logger.debug("Initialized SpawnPoint")
+        #logger.debug("Initialized SpawnPoint")
         super().parse(json, convert_types=True)
 
         return self

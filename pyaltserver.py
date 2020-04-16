@@ -54,6 +54,12 @@ class TailThread(threading.Thread):
             wd = inotify.add_watch(self.config.log_path, mask)
 
             while True:
+#                #check for queued events from the servers as well!
+#                event_from_server = self.queue.get_nowait()
+#                if event_from_server:
+#                    self.logger.info('Got event back from server: %s' % server)# not sure what this is going to look like yet
+#                    self.process_server_event(event_from_server)
+
                 do_break = False
                 for event in inotify.read():
                     for flag in flags.from_mask(event.mask):
@@ -69,6 +75,18 @@ class TailThread(threading.Thread):
         self.run(rollover=True)
 
 
+#    def process_server_event(self, server_event):
+#        #eventually pass this to a class
+#        #first off, parse the json and getPlayers
+#
+#        #{'vaporId': '0a29dfcf-26ec-477c-9a48-d7fe035f284a', 
+#        #'level': 60, 'ip': '172.112.31.38:36346', 
+#        #'type': 'clientAdd','port': 27284, 'nickname': 
+#        #'Bukowski', 'time': 40130, 'player': 0}
+
+        
+
+
     def logfile_modified(self, fh):
         self._buffer += fh.read()
         events = self._buffer.split('\n')
@@ -79,21 +97,26 @@ class TailThread(threading.Thread):
             del events[-1]
 
         for event in events:
-            self.parse_event(event)
+            self.route_event(self.parse_event(event))
+
 
     def parse_event(self, event):
         try:
             event = ujson.loads(event)
-            self.route_event(event)
         except ValueError:
             self.logger.error("Could not parse log line: %s" % event)
             raise
+        return event
+
 
     def route_event(self, event):
+        #process all client events on the main thread
+        #if event['port'] != -1 and event['type'] not in ('clientAdd', 'clientRemove', 'serverMessage'): #serverWhisper, etc???
         if event['port'] != -1:
             #send to the execute on the thread pool on the specific server
             server = self.config.get_server(event['port'])
             server.queue.put(event)
+            #self.logger.debug('Events in %s queue: %s' % (server.serverName, server.queue.qsize()))
         else:
             #execute on the default thread
             self.queue.put(event)
@@ -128,12 +151,9 @@ class Main(object):
         self.config = Config(conf)
         self.queue = queue.Queue()
 
-        ##################
-        # NOTE
-        #
-        # parse config here and pass in
-        # also determine which modules to load 
-        # and pass in through to workers
+        self.config.start_server_thread_pools()
+
+
         tail_thread = TailThread(self.config, self.queue)
         tail_thread.start()
 
@@ -152,7 +172,7 @@ class Main(object):
         while True:
             try:
                 line = self.queue.get()
-                worker = Worker(line, self.config)
+                worker = Worker(line, self.config, modules=list())
                 worker.execute()
                 time.sleep(.1)
             except KeyboardInterrupt:
@@ -163,6 +183,6 @@ class Main(object):
 if __name__ == "__main__":
     from datetime import datetime
     
-    Main().run(conf='pyalt.yaml', logfile='./PYALTITUDE_%s.log' % datetime.now(), debug=False)
+    Main().run(conf='./pyalt.yaml', logfile='./PYALTITUDE_%s.log' % datetime.now(), debug=False)
 
 

@@ -37,10 +37,6 @@ class Config(object):
         server_conf = filecnf['servers']
         self.config_servers(server_conf)
 
-        # It doesn't seem right to start the servers from a "config" layer
-        # perhaps its named wrong, or I have it layed out wrong
-        self.start_server_thread_pools()
-
 
     def start_server_thread_pools(self):
         for server in self.server_launcher.servers:

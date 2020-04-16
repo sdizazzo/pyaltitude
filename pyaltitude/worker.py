@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 #        return '%s - %s' % (self.extra['classPath'], msg), kwargs
 
 class Worker(Events):
+    """
+        Each worker has all of the default events on it and each module event
+        is dynamically appended to it as well.
+    """
+
     #log_classPath = ClassPathAdapter(logger,{'classPath':inspect.currentframe().f_back.f_code.co_name})
 
     def __init__(self, event, config, modules=None, thread_lock=None):
@@ -33,15 +38,17 @@ class Worker(Events):
         return events
 
 
-    def execute(self):
-        if self.modules:
-            for module in self.modules:
-                module.config = self.config
-                module.thread_lock = self.thread_lock
-                for func_name in self.get_module_events(module()):
-                    func = getattr(module(), func_name)
-                    setattr(self, func_name, func)
+    def attach_module(self, module):
+        module.config = self.config
+        module.thread_lock = self.thread_lock
+        for func_name in self.get_module_events(module()):
+            func = getattr(module(), func_name)
+            setattr(self, func_name, func)
 
+
+    def execute(self):
+        for module in self.modules:
+            self.attach_module(module)
 
         try:
             logger.debug("Processing event %s" % self.event)

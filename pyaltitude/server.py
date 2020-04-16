@@ -61,7 +61,7 @@ class Server(base.Base, commands.Commands):
         # set dynamically from yaml file
         # see config_from_yaml() passed from config.py
         self.workers = 1
-        self.modules = None
+        self.modules = list()
 
 
     def worker_done_cb(self, fut):
@@ -71,6 +71,7 @@ class Server(base.Base, commands.Commands):
                 fut.result()
             except Exception as e:
                 self.log_serverName.exception('Worker raised exception: %s' % repr(e))
+                #I'd like to get the event and log it here. Not tonight.
 
 
     def run_thread_pool(self):
@@ -80,7 +81,7 @@ class Server(base.Base, commands.Commands):
             worker = Worker(line, self.config, modules=self.modules, thread_lock=self.thread_lock)
             future = pool.submit(worker.execute)
             future.add_done_callback(self.worker_done_cb)
-            time.sleep(.01)
+            #time.sleep(.001)
 
         pool.shutdown(wait=False)
 
@@ -93,7 +94,7 @@ class Server(base.Base, commands.Commands):
 
 
     def add_player(self, player, message=True):
-        logger.info('Adding player %s to server %s' % (player.nickname, self.serverName))
+        logger.info('Adding player %s to server %s, message: %s' % (player.nickname, self.serverName, message))
         self.players.append(player)
         self.players_changed(player, True)
         #logger.debug(player.describe())
@@ -104,16 +105,21 @@ class Server(base.Base, commands.Commands):
         self.players.remove(player)
         self.players_changed(player, False)
 
+    def whisper_all(self, message):
+        for player in self.get_players():
+            player.whisper(message)
 
     def players_changed(self, player, added):
         if not player.is_bot():
             if added:
                 player.whisper('Hey %s!' % player.nickname)
                 player.whisper('Welcome to %s!' % self.serverName)
-                player_count = len(self.get_players())
-                self.serverMessage('%s players now in server' % player_count)
 
-            logger.info("Players now in %s: %s" % (self.serverName, [p.nickname for p in self.get_players()]))
+            players = self.get_players()
+            self.whisper_all('%s players now in server' % len(players))
+
+            self.serverMessage("Players now in server: %s" % len(players))
+            logger.info("Players now in %s: %s" % (self.serverName, [p.nickname for p in players]))
 
 
     #will go into some kind of utils or math module
@@ -160,6 +166,7 @@ class Server(base.Base, commands.Commands):
 
 
     def get_players(self, bots=False):
+        # not atomic!
         pl = list()
         for p in self.players:
             if not bots and p.is_bot():
@@ -198,6 +205,7 @@ class Server(base.Base, commands.Commands):
 
     def config_from_yaml(self, conf):
         for k, v in conf.items():
+            #special case for `modules` key in yaml
             if k and k == 'modules':
                 mods = list()
                 if v:

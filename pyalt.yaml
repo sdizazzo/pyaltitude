@@ -11,14 +11,14 @@ servers:
     modules:
 
   - port   : 27282
-    workers: 12
+    workers: 1
     modules: [king_of_the_hill.KOTH]
 
   - port   : 27283
-    threads: 12
+    workers: 1
     modules: [speedy.SpeedyModule]
 
-  - port   : 27284
-    threads: 6
-    modules: [lobby.Lobby]
+#  - port   : 27284
+#    workers: 1
+#    modules: [lobby.Lobby]
 ...

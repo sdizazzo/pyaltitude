@@ -45,7 +45,6 @@ class Server(base.Base, commands.Commands):
     def __init__(self, config):
         self.config = config
         self.queue = queue.Queue()
-        self.thread_lock = Lock()
 
         # check if player is admin when logging in, then set is_admin
         self.admin_vaporIds = list()
@@ -60,37 +59,22 @@ class Server(base.Base, commands.Commands):
 
         # set dynamically from yaml file
         # see config_from_yaml() passed from config.py
-        self.workers = 1
         self.modules = list()
 
+        #scoped_session - thread local scope
+        self.session = self.config.Session()
 
-    def worker_done_cb(self, fut):
-        exception = fut.exception()
-        if exception:
-            try:
-                fut.result()
-            except Exception as e:
-                self.log_serverName.exception('Worker raised exception: %s' % repr(e))
-                #I'd like to get the event and log it here. Not tonight.
-
-
-    def run_thread_pool(self):
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=self.workers)
+    def run_worker_thread(self, queue):
         while True:
-            line = self.queue.get()
-            worker = Worker(line, self.config, modules=self.modules, thread_lock=self.thread_lock)
-            future = pool.submit(worker.execute)
-            future.add_done_callback(self.worker_done_cb)
-            #time.sleep(.001)
-
-        pool.shutdown(wait=False)
+            line = queue.get()
+            worker = Worker(line, self.config, modules=self.modules)
+            worker.execute()
 
 
-    def run_thread_pool_thread(self):
-        #LOLOLOL
-        logger.info('Initialized thread pool for server: %s with %s workers' % (self.serverName, self.workers))
-        self.thread_pool_thread = Thread(target=self.run_thread_pool, daemon=True)
-        self.thread_pool_thread.start()
+    def start_worker_thread(self):
+        logger.info('Initialized worker thread for server: %s' % self.serverName)
+        self.worker_thread = Thread(target=self.run_worker_thread, args=(self.queue, ), daemon=True)
+        self.worker_thread.start()
 
 
     def add_player(self, player, message=True):
@@ -105,9 +89,11 @@ class Server(base.Base, commands.Commands):
         self.players.remove(player)
         self.players_changed(player, False)
 
+
     def whisper_all(self, message):
         for player in self.get_players():
             player.whisper(message)
+
 
     def players_changed(self, player, added):
         if not player.is_bot():
@@ -116,7 +102,6 @@ class Server(base.Base, commands.Commands):
                 player.whisper('Welcome to %s!' % self.serverName)
 
             players = self.get_players()
-            self.whisper_all('%s players now in server' % len(players))
 
             self.serverMessage("Players now in server: %s" % len(players))
             logger.info("Players now in %s: %s" % (self.serverName, [p.nickname for p in players]))
@@ -151,7 +136,7 @@ class Server(base.Base, commands.Commands):
                 # with the same tick.
                 # I guess I'm sending too many requests...?
                 if now == player.time:
-                    self.log_serverName.warning("Skipping velocity event for %s as time had not changed.  Time: %s" %  (player.nickname, now))
+                    self.log_serverName.debug("Skipping velocity event for %s as time had not changed.  Time: %s" %  (player.nickname, now))
                     #NOTE@@
                     # is this lag??
                     # Can I get the ping and report it when this happens?
@@ -166,7 +151,6 @@ class Server(base.Base, commands.Commands):
 
 
     def get_players(self, bots=False):
-        # not atomic!
         pl = list()
         for p in self.players:
             if not bots and p.is_bot():

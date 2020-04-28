@@ -8,7 +8,9 @@ from pyaltitude.server import Server, ServerLauncher
 
 import yaml
 
-
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session
 logger = logging.getLogger(__name__)
 
 
@@ -32,20 +34,26 @@ class Config(object):
         self.map_dir = os.path.join(self.root, 'maps')
         logger.info("Set map directory: %s" % self.map_dir)
 
+        self.database_url = filecnf['database_url']
+        engine = create_engine(self.database_url, echo=False)
+        session_factory = sessionmaker(bind=engine)
+        self.Session = scoped_session(session_factory)
+
         self.server_launcher = self._parse_launcher_config()
 
         server_conf = filecnf['servers']
         self.config_servers(server_conf)
 
 
-    def start_server_thread_pools(self):
+    def start_servers(self):
         for server in self.server_launcher.servers:
-            server.run_thread_pool_thread()
+            server.start_worker_thread()
 
 
     def config_servers(self, server_conf):
         for sconf in server_conf:
             server = self.get_server(sconf['port'])
+            #now update the server objects with our attrs from the yaml config
             server.config_from_yaml(sconf)
 
 
@@ -61,6 +69,7 @@ class Config(object):
         server_launcher = server_launcher.parse(root.attrib)
 
         for server_config in root.iter("AltitudeServerConfig"):
+            #Instantiate the Server() objects from the server_launcher.xml
             server = Server(config=self)
             server = server.parse(server_config.attrib)
 

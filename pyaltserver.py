@@ -113,7 +113,7 @@ class TailThread(threading.Thread):
         #process all client events on the main thread
         #if event['port'] != -1 and event['type'] not in ('clientAdd', 'clientRemove', 'serverMessage'): #serverWhisper, etc???
         if event['port'] != -1:
-            #send to the execute on the thread pool on the specific server
+            #send to the execute on the specific server
             server = self.config.get_server(event['port'])
             server.queue.put(event)
             #self.logger.debug('Events in %s queue: %s' % (server.serverName, server.queue.qsize()))
@@ -151,7 +151,7 @@ class Main(object):
         self.config = Config(conf)
         self.queue = queue.Queue()
 
-        self.config.start_server_thread_pools()
+        self.config.start_servers()
 
 
         tail_thread = TailThread(self.config, self.queue)

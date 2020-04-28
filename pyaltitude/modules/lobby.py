@@ -141,7 +141,6 @@ class Lobby(module.ServerModule):
 
         event = Event()
         player_thread = Thread(target=self.portal_runner, args=(server, player, event) ,daemon=True)
-        #with self.thread_lock:
         Lobby.players[player.vaporId] = (player_thread, event)
         player_thread.start()
 
@@ -152,13 +151,10 @@ class Lobby(module.ServerModule):
 
     def clientRemove(self, event):
         server = self.config.get_server(event['port'])
-        if server.port == self.port:
-            player = server.get_player_by_number(event['player'])
-            #with self.thread_lock:
-            thread, player_event = Lobby.players[player.vaporId]
-            player_event.set()
-            #with self.thread_lock:
-            del Lobby.players[player.vaporId]
+        player = server.get_player_by_number(event['player'])
+        thread, player_event = Lobby.players[player.vaporId]
+        player_event.set()
+        del Lobby.players[player.vaporId]
 
         #HAVE TO STOP THE EVENT BEFORE WE REMOVE THE PLAYER!!
         events.Events.clientRemove(self, event)

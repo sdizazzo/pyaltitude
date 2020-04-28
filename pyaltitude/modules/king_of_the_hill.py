@@ -3,6 +3,7 @@ import logging
 from threading import Thread, Event, Lock
 
 from . import module
+
 from .. import map
 from .. import events
 
@@ -11,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 class KOTH(module.MapModule):
+    # TODO Rethinking the way Games/Modules/threads inheritance here might work
+    # I think now these can become instance variables, but not now
 
+    #TODO also need to move the thread back onto the Player()
     flag_timer_thread =None
     flag_timer_event = Event()
     flag_taken_by = None
@@ -24,23 +28,6 @@ class KOTH(module.MapModule):
     def __init__(self, map='ball_king_pyramid'):
         self.map_name = map
         
-        # CANT USE INSTANCE VARIABLES!!!!!
-        # BECAUSE EACH WORKER WOULD GET A DIFFERNT
-        # COPY!!!!!!!!!!! 
-        # USE CLASS VARIABLES ABOVE INSTEAD!!!!
-
-        # Also dont forget that whenever updating a
-        # class variable, you must do it within the
-        # context of the thread lock ie.
-
-        # with thread_lock:
-        #     KOTH.flag_taken_by = player
-
-        #...BUT...  I believe that's only possible/necessary
-        # in the events, which are executed in the worker threads
-        # if modified in the main class, you shouldn't need
-        # to use the thread_lock
-
         super().__init__(self, map)
 
     #if noplayers are left on a team, the flag should go back to neutral, 
@@ -129,7 +116,7 @@ class KOTH(module.MapModule):
     # Events
     #################
 
-
+    #@ModuleEvent
     def serverInit(self, event):
         events.Events.serverInit(self, event)
         server = self.config.get_server(event['port'])
@@ -139,6 +126,7 @@ class KOTH(module.MapModule):
         server.testGravityMode(3)
 
 
+    #@ModuleEvent
     def clientAdd(self, event):
         events.Events.clientAdd(self, event)
         server = self.config.get_server(event['port'])
@@ -156,7 +144,7 @@ class KOTH(module.MapModule):
             player.whisper("/a - Shortcut to attach to your last attached teammate.")
             player.whisper("*********************************************************************")
 
-
+    #@ModuleEvent
     def mapChange(self, event):
         # NOTE
         # When  you override an event in a module, you
@@ -167,45 +155,43 @@ class KOTH(module.MapModule):
         # TODO This will get us closer to breaking
         # out the modules into types: server, game, map
         events.Events.mapChange(self, event)
-
         server = self.config.get_server(event['port'])
-        if server.port == 27282:
-            with self.thread_lock:
-                KOTH.flag_timer_event.set()
-                time.sleep(2)
-                self.reset(server)
+        
+        KOTH.flag_timer_event.set()
+        time.sleep(2)
+        self.reset(server)
 
 
+    #@ModuleEvent
     def powerupAutoUse(self, event):
         events.Events.powerupAutoUse(self, event)
-
         server = self.config.get_server(event['port'])
+        
         if server.map.name != self.map_name: return
         if event['powerup'] != 'Health' or (event['positionX'], event['positionY']) != (1501, 1735): return
         #THis is the right powerup
         player = server.get_player_by_number(event['player'])
         #if not player: return
         
-        with self.thread_lock:
-            if not KOTH.flag_taken_by or KOTH.flag_taken_by.team != player.team:
-                #its an event we need to pay attention to
-                if KOTH.flag_timer_thread:
-                    #flag was taken back by the other team
-                    #print out how long it was held for and store it
-                    #server.serverMessage()
+        if not KOTH.flag_taken_by or KOTH.flag_taken_by.team != player.team:
+            #its an event we need to pay attention to
+            if KOTH.flag_timer_thread:
+                #flag was taken back by the other team
+                #print out how long it was held for and store it
+                #server.serverMessage()
                     
-                    #stop the last timer
-                    self.flag_timer_event.set()
+                #stop the last timer
+                self.flag_timer_event.set()
 
-                team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
-                other_color = 'orange' if team_color == 'blue' else 'blue'
-                server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
-                logger.info('%s took the flag for the %s team' % (player.nickname, team_color))
+            team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
+            other_color = 'orange' if team_color == 'blue' else 'blue'
+            server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
+            logger.info('%s took the flag for the %s team' % (player.nickname, team_color))
 
-                KOTH.flag_taken_by = player
-                KOTH.flag_taken_at = event['time']
-                KOTH.flag_timer_event = Event()
-                #start a new timer for this player
-                KOTH.flag_timer_thread = Thread(target=self.flag_timer, args=(server, player, KOTH.flag_timer_event), daemon=True)
-                KOTH.flag_timer_thread.start() 
+            KOTH.flag_taken_by = player
+            KOTH.flag_taken_at = event['time']
+            KOTH.flag_timer_event = Event()
+            #start a new timer for this player
+            KOTH.flag_timer_thread = Thread(target=self.flag_timer, args=(server, player, KOTH.flag_timer_event), daemon=True)
+            KOTH.flag_timer_thread.start() 
 

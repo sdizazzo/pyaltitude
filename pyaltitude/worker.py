@@ -23,11 +23,10 @@ class Worker(Events):
 
     #log_classPath = ClassPathAdapter(logger,{'classPath':inspect.currentframe().f_back.f_code.co_name})
 
-    def __init__(self, event, config, modules=None, thread_lock=None):
+    def __init__(self, event, config, modules=None):
         self.event = event
         self.config = config
         self.modules = modules
-        self.thread_lock = thread_lock
 
 
     def get_module_events(self, module):
@@ -40,7 +39,6 @@ class Worker(Events):
 
     def attach_module(self, module):
         module.config = self.config
-        module.thread_lock = self.thread_lock
         for func_name in self.get_module_events(module()):
             func = getattr(module(), func_name)
             setattr(self, func_name, func)

@@ -6,6 +6,9 @@ from pyaltitude.player import Player
 from pyaltitude.map import Map
 from pyaltitude.enums import MapState
 
+from .db import get_or_create
+from .model import *
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +37,33 @@ class Events(object):
     def serverInit(self, event):
         pass
 
+
     def clientAdd(self, event):
         server = self.config.get_server(event['port'])
         player = Player(server)
         player = player.parse(event)
         server.add_player(player)
+
+        if player.is_bot(): return
+        #database
+        try:
+            dbserver = get_or_create(server.session, DBServer, port=server.port, name=server.serverName)
+            dbnickname = get_or_create(server.session, DBNickname, nickname=player.nickname)
+            dbhost = get_or_create(server.session, DBHost, address=player.ip.split(':')[0])
+            dbplayer = get_or_create(server.session, DBPlayer, vapor_id=player.vaporId)
+
+            if not dbnickname in dbplayer.nicknames:
+                dbplayer.nicknames.append(dbnickname)
+            if not dbhost in dbplayer.hosts:
+                dbplayer.hosts.append(dbhost)
+
+            dbsession = DBSession(player=dbplayer, server=dbserver)
+            server.session.add(dbsession)
+
+            server.session.commit()
+        except:
+            server.session.rollback()
+            raise
 
 
     def clientRemove(self, event):
@@ -47,6 +72,21 @@ class Events(object):
         # see https://github.com/sdizazzo/pyaltitude/issues/4
         player = server.get_player_by_vaporId(event['vaporId'])
         server.remove_player(player, event['reason'], event['message'])
+
+        if player.is_bot(): return
+
+        #database
+        try:
+            dbsession = server.session.query(DBSession).filter_by(player_id=player.vaporId, active=True).first()
+            now = datetime.now()
+            dbsession.logout = now
+            dbsession.duration = (now - dbsession.login).seconds
+            dbsession.active = False
+            dbsession.reason_closed = event['reason']
+            server.session.commit()
+        except:
+            server.session.rollback()
+            raise
 
 
     def spawn(self, event):

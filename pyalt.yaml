@@ -1,24 +1,23 @@
 ---
 root: /home/sean/altitude/
+database_url: postgresql+psycopg2://test_user:blahblahblah@localhost/test?host=/tmp
 
 servers:
+  #Wide Angle
   - port   : 27278
-    workers: 1
-    modules:
 
+  # FFA Wide Angle
   - port   : 27279
-    workers: 1
-    modules:
 
+  # King of the Hill
   - port   : 27282
-    workers: 1
     modules: [king_of_the_hill.KOTH]
 
+  #Speed Ball
   - port   : 27283
-    workers: 1
     modules: [speedy.SpeedyModule]
 
+#Space Lounge
 #  - port   : 27284
-#    workers: 1
 #    modules: [lobby.Lobby]
 ...

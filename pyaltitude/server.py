@@ -1,9 +1,11 @@
-import uuid, time
+import os, uuid, time
 import math
 import queue
 import logging
 import importlib
+import subprocess
 
+from signal import SIGTERM
 from threading import Lock, Thread
 from collections import namedtuple
 
@@ -11,6 +13,8 @@ import concurrent.futures
 
 from . import base
 from . import commands
+
+import pyaltitude.db as database
 
 from pyaltitude.worker import Worker
 
@@ -26,13 +30,80 @@ class ServerNameAdapter(logging.LoggerAdapter):
         return '%s - %s' % (self.extra['server'], msg), kwargs
 
 
-class ServerLauncher(base.Base):
+class ServerManager(base.Base):
     servers = list()
+
+    """
+        #
+        # server_launcher command line options!
+        # I figued it was a hidden gem, and if I didnt
+        # keep a record, nobody would ever see it again!
+        #
+           -ip X
+           -updatePort X
+           -gamePorts X,Y,Z
+           -maxPlayers X,Y,Z
+           -downloadMaxKilobytesPerSecond X,Y,Z
+        Example for 1 instance: ./server_launcher -ip 192.168.1.3 -updatePort 40000 -gamePorts 40001 -maxPlayers 14 -downloadMaxKilobytesPerSecond 40
+        Example for 3 instances: ./server_launcher -ip 192.168.1.3 -updatePort 40000 -gamePorts 40001,40002,40003 -maxPlayers 8,14,14 -downloadMaxKilobytesPerSecond 40,80,80
+
+        Other options:
+           -noui            disables graphical user interface in non-headless environments
+        ERROR [2020-04-30 16:40:17,394] [main]: Press [Enter] to exit
+
+    """
+
 
     def server_for_port(self, port):
         for server in self.servers:
             if server.port == port:
                 return server
+
+
+    def broadcast_msg(self, msg):
+        logger.info("broadcasting message to all servers: '%s'" % msg)
+        for server in self.servers:
+           server.serverMessage(msg)
+
+
+    def get_java_pid(self):
+        cp = subprocess.run(['ps', '-ef'],
+                            capture_output=True,
+                            check=True,
+                            universal_newlines=True
+                            )
+
+
+        for pline in cp.stdout.split('\n'):
+            if all(p in pline for p in ('java', 'server_launcher')):
+                return int(pline.split()[1])
+
+
+    def shutdown_java_server(self):
+        pid = self.get_java_pid()
+        if not pid:
+            raise ValueError('Could not determine determine pid for altitude server.  Is it running?')
+
+        os.kill(pid, SIGTERM)
+
+
+    def shutdown(self, alti_server=True):
+        for server in self.servers:
+            logger.info('Shutting down %s' % server.serverName)
+            server.shutdown()
+
+        if alti_server:
+            logger.info('Shutting down Altitude server')
+            self.shutdown_java_server()
+
+
+    def servers_with_players(self):
+        servers = []
+        for server in self.servers:
+            if server.get_players():
+                servers.append(server)
+        return servers
+
 
     def parse(self, attrs):
         super().parse(attrs, convert_types=True)
@@ -63,6 +134,24 @@ class Server(base.Base, commands.Commands):
 
         #scoped_session - thread local scope
         self.session = self.config.Session()
+
+    def shutdown(self):
+        #TODO do I even need to do `get_players() anymore?
+        for player in self.get_players():
+            logger.warning("Dropping %s from %s" % (player.nickname, self.serverName))
+            self.serverMessage("Dropping %s from %s"  % (player.nickname, self.serverName))
+            self.drop(player)
+            time.sleep(.2)
+            # NOTE since drop() is called before the removeClient
+            # it appears the database is never updated  that the client was
+            # dropped. SO lets call it manually
+            # dropped. SO lets call it manually
+            # is this the "correct" solution?  I'm not sure, but it seems the
+            # best ATM
+
+            # Send a mock the event with only the needed field
+            database.client_remove(player, self, {'reason':'Dropped by server admin'})
+
 
     def run_worker_thread(self, queue):
         while True:
@@ -148,7 +237,6 @@ class Server(base.Base, commands.Commands):
                 player.velocity = distance/elapsed
 
             player.x, player.y, player.angle, player.time = (int(x), int(y), int(angle), now)
-
 
     def get_players(self, bots=False):
         pl = list()

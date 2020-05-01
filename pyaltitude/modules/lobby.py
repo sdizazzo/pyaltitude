@@ -109,7 +109,7 @@ class Lobby(module.ServerModule):
                 dest_server = self.config.get_server(dest_port)
                 logger.info("Sending %s to server %s" % (player.nickname, dest_server.serverName))
                 server.serverMessage('%s is entering %s' % (player.nickname, dest_server.serverName))
-                server.serverRequestPlayerChangeServer(player, self.config.server_launcher.ip, dest_port, secret_code=None)
+                server.serverRequestPlayerChangeServer(player, self.config.server_manager.ip, dest_port, secret_code=None)
                 sent = True
                 #Instead of stopping the thread here, we should count on the
                 #clientRemove event coming to stop the thread
@@ -144,7 +144,7 @@ class Lobby(module.ServerModule):
         Lobby.players[player.vaporId] = (player_thread, event)
         player_thread.start()
 
-        for serv in self.config.server_launcher.servers:
+        for serv in self.config.server_manager.servers:
             if server != serv:
                 player.whisper('%s players currently in %s' % (len(serv.get_players()), serv.serverName))
 

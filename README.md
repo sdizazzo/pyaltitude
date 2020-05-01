@@ -5,6 +5,9 @@ Depends on Altitude server patches from https://gitlab.com/sdizazzo/server_patch
 __Dependencies:__
 
 - python3.7
+- Postgresql <-- Should be optional
+- psycopg2 (or similar pqsql connector)
+- SQLAlchemy
 - ujson
 - pyyaml
 - inotify_simple

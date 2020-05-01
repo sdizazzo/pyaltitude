@@ -4,7 +4,7 @@ import logging
 
 import xml.etree.ElementTree as ET
 
-from pyaltitude.server import Server, ServerLauncher
+from pyaltitude.server import Server, ServerManager
 
 import yaml
 
@@ -39,14 +39,14 @@ class Config(object):
         session_factory = sessionmaker(bind=engine)
         self.Session = scoped_session(session_factory)
 
-        self.server_launcher = self._parse_launcher_config()
+        self.server_manager = self._parse_launcher_config()
 
         server_conf = filecnf['servers']
         self.config_servers(server_conf)
 
 
     def start_servers(self):
-        for server in self.server_launcher.servers:
+        for server in self.server_manager.servers:
             server.start_worker_thread()
 
 
@@ -65,18 +65,18 @@ class Config(object):
             contents = f.read()
 
         root = ET.fromstring(contents)
-        server_launcher = ServerLauncher()
-        server_launcher = server_launcher.parse(root.attrib)
+        server_manager = ServerManager()
+        server_manager = server_manager.parse(root.attrib)
 
         for server_config in root.iter("AltitudeServerConfig"):
-            #Instantiate the Server() objects from the server_launcher.xml
+            #Instantiate the Server() objects from the server_manager.xml
             server = Server(config=self)
             server = server.parse(server_config.attrib)
 
-            server_launcher.servers.append(server)
+            server_manager.servers.append(server)
 
-        #mapList = root.find('mapList')
-        return server_launcher  
+            #mapList = root.find('mapList')
+        return server_manager
 
 
     ####################
@@ -84,5 +84,5 @@ class Config(object):
     ####################
 
     def get_server(self, port):
-        return self.server_launcher.server_for_port(port)
+        return self.server_manager.server_for_port(port)
 

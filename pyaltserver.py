@@ -5,7 +5,9 @@ import queue
 import time
 import logging
 import threading
+import signal
 
+from functools import partial
 from logging.handlers import RotatingFileHandler
 
 import xml.etree.ElementTree as ET
@@ -13,13 +15,13 @@ import concurrent.futures
 
 from pyaltitude.config import Config
 from pyaltitude.worker import Worker
+from pyaltitude.enums import PyaltEnum
 #from pyaltitude.custom_commands import attach
 
 from inotify_simple import INotify, flags
 import ujson
 
 logger = logging.getLogger('pyaltitude')
-
 
 
 class TailThread(threading.Thread):
@@ -46,7 +48,7 @@ class TailThread(threading.Thread):
                 #inotify_simple known issue
                 #https://github.com/chrisjbillington/inotify_simple/issues/17
                 self.logger.critical('inotify_simple version error on this kernel')
-                self.queue.put(99)
+                self.queue.put(PyaltEnum.INOTIFY_ERR)
                 return
 
 
@@ -54,12 +56,6 @@ class TailThread(threading.Thread):
             wd = inotify.add_watch(self.config.log_path, mask)
 
             while True:
-#                #check for queued events from the servers as well!
-#                event_from_server = self.queue.get_nowait()
-#                if event_from_server:
-#                    self.logger.info('Got event back from server: %s' % server)# not sure what this is going to look like yet
-#                    self.process_server_event(event_from_server)
-
                 do_break = False
                 for event in inotify.read():
                     for flag in flags.from_mask(event.mask):
@@ -73,18 +69,6 @@ class TailThread(threading.Thread):
                 if do_break: break
 
         self.run(rollover=True)
-
-
-#    def process_server_event(self, server_event):
-#        #eventually pass this to a class
-#        #first off, parse the json and getPlayers
-#
-#        #{'vaporId': '0a29dfcf-26ec-477c-9a48-d7fe035f284a', 
-#        #'level': 60, 'ip': '172.112.31.38:36346', 
-#        #'type': 'clientAdd','port': 27284, 'nickname': 
-#        #'Bukowski', 'time': 40130, 'player': 0}
-
-        
 
 
     def logfile_modified(self, fh):
@@ -110,8 +94,6 @@ class TailThread(threading.Thread):
 
 
     def route_event(self, event):
-        #process all client events on the main thread
-        #if event['port'] != -1 and event['type'] not in ('clientAdd', 'clientRemove', 'serverMessage'): #serverWhisper, etc???
         if event['port'] != -1:
             #send to the execute on the specific server
             server = self.config.get_server(event['port'])
@@ -145,7 +127,36 @@ class Main(object):
             logger.info("Logging to file at %s" % logfile)
 
 
+    def shutdown(self, signum, frame):
+        logger.warning("Shutting down after receiving %s" % ("SIGINT" if signum == 2 else "SIGTERM"))
+        #check all the servers and send them a message to logout
+        # this is ugly!
+        servers_with_players = self.config.server_manager.servers_with_players()
+        if servers_with_players:
+            t = 30
+            msg = "Shutting down server in %s seconds, please end your session. Sorry!"
+            logger.warning("Giving logged in players %s seconds to log out before they will be dropped" % t)
+            do_break = True
+            while t > 0:
+                for server in servers_with_players:
+                    if not t%10:
+                        logger.warning('Shutdown in %s' % t)
+                        server.serverMessage(msg % t)
+                    elif t < 6:
+                        server.serverMessage(msg % t)
+                t -= 1
+                time.sleep(1)
+
+        # drop any players on the servers, and shutdown the
+        # altitude server itself
+        self.config.server_manager.shutdown(alti_server=True)
+        self.queue.put(PyaltEnum.SHUTDOWN)
+
+
     def run(self, conf='./pyalt.yaml', logfile=None, debug=False):
+        signal.signal(signal.SIGTERM, self.shutdown)
+        signal.signal(signal.SIGINT, self.shutdown)
+
         self.setup_logging(logfile, debug)
 
         self.config = Config(conf)
@@ -157,7 +168,11 @@ class Main(object):
         tail_thread = TailThread(self.config, self.queue)
         tail_thread.start()
 
-        if not self.queue.empty() and self.queue.get(timeout=0.5) == 99:
+        """
+        Not sure if this deserves to be here, but its such an insidiuos error,
+        im going to leave it for now.
+        """
+        if not self.queue.empty() and self.queue.get(timeout=0.5) == PyaltEnum.INOTIFY_ERR:
             print()
             print("Your system appears to be an older kernel that requires running a")
             print("specific version of inotify_simple.  Please install it by running:")
@@ -170,15 +185,15 @@ class Main(object):
 
         logger.info('Waiting for events on main thread')
         while True:
-            try:
-                line = self.queue.get()
-                worker = Worker(line, self.config, modules=list())
-                worker.execute()
-                time.sleep(.1)
-            except KeyboardInterrupt:
-                logger.info('Done.')
+            data = self.queue.get()
+            if data == PyaltEnum.SHUTDOWN:
                 break
-                
+
+            worker = Worker(data, self.config, modules=list())
+            worker.execute()
+
+        logger.info('Done.')
+
 
 if __name__ == "__main__":
     from datetime import datetime

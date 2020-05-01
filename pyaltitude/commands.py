@@ -61,6 +61,13 @@ class Commands(object):
         self._send('overrideBallScore', leftscore, rightscore)
 
     def serverRequestPlayerChangeServer(self, player, ip, port, secret_code=None):
+        #does it work?!
         ip = ip +':'+str(port)
         self._send('serverRequestPlayerChangeServer', player.nickname.replace(' ', '\ '), ip, secret_code or 'null')
+
+    def drop(self, player):
+        #TODO
+        #if player.is_admin:
+        #    raise SomeError('Server administrators cannot be dropped')
+        self._send('drop', player.nickname.replace(' ', '\ '))
 

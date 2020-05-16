@@ -66,8 +66,10 @@ class TailThread(threading.Thread):
                         elif flag is flags.MODIFY:
                             self.logfile_modified(fh)
 
-                if do_break: break
+                if do_break:
+                    break
 
+        inotify.close()
         self.run(rollover=True)
 
 

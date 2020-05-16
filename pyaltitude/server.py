@@ -49,7 +49,6 @@ class ServerManager(base.Base):
 
         Other options:
            -noui            disables graphical user interface in non-headless environments
-        ERROR [2020-04-30 16:40:17,394] [main]: Press [Enter] to exit
 
     """
 
@@ -117,16 +116,15 @@ class Server(base.Base, commands.Commands):
         self.config = config
         self.queue = queue.Queue()
 
+        self.game = None
+
         # check if player is admin when logging in, then set is_admin
         self.admin_vaporIds = list()
         self.players = list() # <--- on active map??
 
 
-        #self.teams = set() # server.map.leftteam, rightteam
-        self.mapList = list() # can these be added to dynamically? check commands
-        self.mapRotationList = list()
-
-        self.map = MockMap()
+        #self.mapList = list() # can these be added to dynamically? check commands
+        #self.mapRotationList = list()
 
         # set dynamically from yaml file
         # see config_from_yaml() passed from config.py
@@ -134,6 +132,7 @@ class Server(base.Base, commands.Commands):
 
         #scoped_session - thread local scope
         self.session = self.config.Session()
+
 
     def shutdown(self):
         #TODO do I even need to do `get_players() anymore?

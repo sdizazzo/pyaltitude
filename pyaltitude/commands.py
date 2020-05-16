@@ -2,7 +2,6 @@
 
 import subprocess, logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,15 +25,23 @@ class Commands(object):
         logger.debug('Executing "%s"' % cmd)
         subprocess.run(cmd, shell=True)
 
+
+    def _e(self, msg):
+        #map?
+        for c in (' ', '`', "'", '"'):
+            msg = msg.replace(c, '\%s' % c)
+        return msg
+
+
     def listPlayers(self):
         self._send('listPlayers')
 
     def serverWhisper(self, player, message):
         if player.is_bot(): return
-        self._send('serverWhisper', player.nickname.replace(' ', '\ '), message)
+        self._send('serverWhisper', self._e(player.nickname), self._e(message))
 
     def serverMessage(self, message):
-        self._send('serverMessage', message)
+        self._send('serverMessage', self._e(message))
 
     def changeMap(self, map):
         self._send('changeMap', map)
@@ -43,7 +50,7 @@ class Commands(object):
         self._send('applyForce', player.player, x, y)
 
     def assignTeam(self, player, team):
-        self._send('assignTeam', player.nickname.replace(' ', '\ '), team)
+        self._send('assignTeam', self._e(player.nickname), team)
 
     def balanceTeams(self):
         self._send('balanceTeams')
@@ -55,7 +62,7 @@ class Commands(object):
         self._send('testCameraViewScale', scale)
 
     def overrideSpawnPoint(self, player, x, y, angle):
-        self._send('overrideSpawnPoint', player.nickname.replace(' ', '\ '), x, y, angle)
+        self._send('overrideSpawnPoint', self._e(player.nickname), x, y, angle)
 
     def overrideBallScore(self, leftscore, rightscore):
         self._send('overrideBallScore', leftscore, rightscore)
@@ -63,11 +70,11 @@ class Commands(object):
     def serverRequestPlayerChangeServer(self, player, ip, port, secret_code=None):
         #does it work?!
         ip = ip +':'+str(port)
-        self._send('serverRequestPlayerChangeServer', player.nickname.replace(' ', '\ '), ip, secret_code or 'null')
+        self._send('serverRequestPlayerChangeServer', self._e(player.nickname), ip, secret_code or 'null')
 
     def drop(self, player):
         #TODO
         #if player.is_admin:
         #    raise SomeError('Server administrators cannot be dropped')
-        self._send('drop', player.nickname.replace(' ', '\ '))
+        self._send('drop', self._e(player.nickname))
 

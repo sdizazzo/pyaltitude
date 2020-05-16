@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone, timedelta, tzinfo
 
 from pyaltitude.player import Player
-from pyaltitude.map import Map
+from pyaltitude.game import Game
 from pyaltitude.enums import MapState
 
 import pyaltitude.db as database
@@ -54,6 +54,13 @@ class Events(object):
         player = server.get_player_by_vaporId(event['vaporId'])
         server.remove_player(player, event['reason'], event['message'])
 
+
+        #Cleanup the player
+        for team in server.game.teams:
+            if player in team.players:
+                logger.debug('Removing %s from Team #%s, server: %s' % (player.nickname, team.number, server.serverName))
+                team.players.remove(player)
+
         if player.is_bot(): return
 
         database.client_remove(player, server, event)
@@ -61,9 +68,6 @@ class Events(object):
 
     def spawn(self, event):
         server = self.config.get_server(event['port'])
-        #{'plane': 'Biplane', 'port': 27280, 'perkGreen': 'Heavy Armor',
-        #'perkRed': 'Heavy Cannon', 'skin': 'No Skin', 'team': 4, 'time':
-        #18018150, 'type': 'spawn', 'perkBlue': 'Ultracapacitor', 'player': 2}
         player = server.get_player_by_number(event['player'])
         player.spawned()
 
@@ -74,16 +78,7 @@ class Events(object):
 
 
     def mapLoading(self, event):
-        server = self.config.get_server(event['port'])
-        #{'port': 27279, 'time': 16501201, 'type': 'mapLoading', 'map':'ffa_core'}
-        # THis event gives us the map name which is enough to
-        # instatiate the map object and begin parsing the map 
-        # file for what we need:
-        #    * right now just the spawn points so we can reset to them
-        #      after an /attach to a player
-        map_ = Map(server, self.config, event['map'])
-        map_.parse_alte()
-        server.map = map_
+        pass
 
 
     def serverHitch(self, event):
@@ -93,7 +88,8 @@ class Events(object):
 
 
     def roundEnd(self, event):
-        pass
+        server = self.config.get_server(event['port'])
+        server.game.stop()
 
 
     def powerupUse(self, event):
@@ -112,22 +108,8 @@ class Events(object):
         server = self.config.get_server(event['port'])
         #{"mode":"ball","rightTeam":5,"port":27278,"leftTeam":6,"time":5808529,"type":"mapChange","map":"ball_cave"}
 
-        wait = .5
-        t = 0
-        while not server.map.state == MapState.READY:
-            time.sleep(wait)
-            #self.log_classPath.warning('mapChange: Sleeping waiting for map to become available: %s' % server.map.name)
-            logger.warning('mapChange: Sleeping waiting for map to become available: %s' % server.map.name)
-            t+=wait
-            if t >= 10:
-                #Cant conttnue here because the MockMap isn't initialized so
-                #server.map.parse() will fail
-                #TODO Not sure how to handle this properly yet
-                logger.critical('****** mapChange: Took over 10 seconds to parse map. *******')
-                return
-
-        server.map.parse(event)
-        server.map.state = MapState.ACTIVE
+        server.game = Game(server, self.config, event)
+        server.game.start()
 
 
     def playerInfoEv(self, event):
@@ -141,10 +123,27 @@ class Events(object):
     def teamChange(self, event):
         server = self.config.get_server(event['port'])
         player = server.get_player_by_number(event['player'])
+        team = server.game.get_team_by_number(event['team'])
+
+        logger.debug('Adding %s to Team #%s, server: %s' % (player.nickname, team.number, server.serverName) )
+        team.players.append(player)
+
+        for t in server.game.teams:
+            if t is team: continue
+            if player in t.players:
+                logger.debug('Removing %s from Team #%s, server: %s' % (player.nickname, t.number, server.serverName))
+                t.players.remove(player)
+
+        for team in server.game.teams:
+            for player in team.get_players():
+                logger.debug('Server: %s  Team #%s  Player: %s' % (server.serverName, team.number, player.nickname))
+
+        #DEPRECATED
         player.team = event['team']
 
 
     def attach(self, server, from_player, to_player):
+        #TODO needs tobe fixed for Team()
         if from_player.team == 2:
             from_player.whisper("Can't attach from spec")
             return

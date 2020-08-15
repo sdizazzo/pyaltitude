@@ -8,6 +8,7 @@ from pyaltitude.enums import MapState
 
 import pyaltitude.db as database
 
+import ujson
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +66,27 @@ class Events(object):
 
         database.client_remove(player, server, event)
 
+    def despawn(self, event):
+        """
+        {'plane': 'Explodet',
+            'stats': {'Crashes': 0, 'Kills': 0, 'Longest Life': 0, 'Ball Possession Time': 0, 'Goals Scored': 0, 'Damage Received': 100.41283, 'Assists': 1, 'Experience': 4, 'Damage Dealt': 0, 'Goals Assisted': 0, 'Damage Dealt to Enemy Buildings': 0, 'Deaths': 1, 'Multikill': 0, 'Kill Streak': 0}, 'port': 27286, 'perkGreen': 'Heavy Armor', 'perkRed': 'Director', 'skin': 'No Skin', 'team': 7, 'time': 52997, 'type': 'despawn', 'perkBlue': 'Reverse Thrust', 'player': 22}
+        """
+        server = self.config.get_server(event['port'])
+        player = server.get_player_by_number(event['player'])
+
+        #player died, update his stats!
+        # NOTE: if the server removes a player for timing out
+        # need to check they exist before updating them
+        # Despawn is probably called before clientRemove
+        if player and not player.is_bot():
+            database.update_player_stats(player, server, event)
+        player.spawn_time = None
+
 
     def spawn(self, event):
         server = self.config.get_server(event['port'])
         player = server.get_player_by_number(event['player'])
-        player.spawned()
+        player.spawned(event['time'])
 
 
     def logPlanePositions(self, event):
@@ -88,8 +105,34 @@ class Events(object):
 
 
     def roundEnd(self, event):
+        #TODO Clean this UP!!
         server = self.config.get_server(event['port'])
-        server.game.stop()
+        event['players'] = list()
+        for i in event['participants']:
+            event['players'].append(server.get_player_by_number(i, bots=True))
+
+        game_stats = dict()
+        for player in event['players']:
+            p_stats = dict()
+            for stat, vals in event['participantStatsByName'].items():
+                try:
+                    p_stats[stat] = vals[player.player]
+                except IndexError:
+                    continue
+            p_stats['awards'] = list()
+
+            #I know this horrible to do this nested but for now
+            for award, i in event['winnerByAward'].items():
+                if i == player.player:
+                    p_stats['awards'].append(award)
+            game_stats[player] = p_stats
+
+        #for p, stats in game_stats.items():
+        #    if p.is_bot(): continue
+        #    for name, val in stats.items():
+        #        logger.info("STATS for %s: %s: %s" % (player.nickname, name, val))
+
+        server.game.stop(game_stats)
 
 
     def powerupUse(self, event):
@@ -125,14 +168,16 @@ class Events(object):
         player = server.get_player_by_number(event['player'])
         team = server.game.get_team_by_number(event['team'])
 
-        logger.debug('Adding %s to Team #%s, server: %s' % (player.nickname, team.number, server.serverName) )
-        team.players.append(player)
+        if not player.is_bot():
+            logger.info('Adding %s to Team #%s, server: %s' % (player.nickname, team.number, server.serverName) )
+        team.add_player(player)
 
         for t in server.game.teams:
             if t is team: continue
             if player in t.players:
-                logger.debug('Removing %s from Team #%s, server: %s' % (player.nickname, t.number, server.serverName))
-                t.players.remove(player)
+                if not player.is_bot():
+                    logger.info('Removing %s from Team #%s, server: %s' % (player.nickname, t.number, server.serverName))
+                t.remove_player(player)
 
         for team in server.game.teams:
             for player in team.get_players():

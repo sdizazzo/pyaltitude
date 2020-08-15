@@ -3,8 +3,8 @@ root: /home/sean/altitude/
 database_url: postgresql+psycopg2://test_user:blahblahblah@localhost/test?host=/tmp
 
 servers:
-  #Wide Angle
-  - port   : 27278
+  #Daily Dogfights
+  - port   : 27287
 
   # FFA Wide Angle
   - port   : 27279

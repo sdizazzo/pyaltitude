@@ -188,6 +188,10 @@ class Server(base.Base, commands.Commands):
             if added:
                 player.whisper('Hey %s!' % player.nickname)
                 player.whisper('Welcome to %s!' % self.serverName)
+                player.whisper('Simple stat tracking is now active at http://216.70.113.96:5000/')
+                player.whisper('Super basic, but perhaps something better will grow from it in time.')
+                #player.whisper('grow from it in time.')
+
 
             players = self.get_players()
 

@@ -28,6 +28,8 @@ class Player(base.Base):
         self.game_thread = None
         self.game_event = Event()
 
+    def __repr__(self):
+        return "<Player(nickname='%s', vaporID='%s')>" % (self.nickname, self.vaporId)
 
     def parse(self, json):
         self._json = json
@@ -49,8 +51,9 @@ class Player(base.Base):
     def applyForce(self, x, y):
         self.server.applyForce(self, x, y)
 
-    def spawned(self):
+    def spawned(self, time):
         #reset our spawn point after a call to /attach
+        self.spawn_time = int(time)
         if self.attached:
             time.sleep(.2) # where does this sleep run????  in a thread only is
                            # acceptable...yes Worker()
@@ -69,3 +72,5 @@ class Player(base.Base):
     def __eq__(self, other):
         return self.nickname == other.nickname
 
+    def __hash__(self):
+        return hash(self.vaporId)

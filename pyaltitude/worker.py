@@ -26,7 +26,7 @@ class Worker(Events):
     def __init__(self, event, config, modules=None):
         self.event = event
         self.config = config
-        self.modules = modules
+        self.modules = modules or list()
 
 
     def get_module_events(self, module):

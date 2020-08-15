@@ -41,33 +41,39 @@ class TailThread(threading.Thread):
         else:
             self.logger.info('Begin tailing log file at %s' % self.config.log_path)
 
-        with open(self.config.log_path, 'rt') as fh:
-            try:
-                inotify = INotify()
-            except IsADirectoryError as e:
-                #inotify_simple known issue
-                #https://github.com/chrisjbillington/inotify_simple/issues/17
-                self.logger.critical('inotify_simple version error on this kernel')
-                self.queue.put(PyaltEnum.INOTIFY_ERR)
-                return
+        try:
+            with open(self.config.log_path, 'rt') as fh:
+                try:
+                    inotify = INotify()
+                except IsADirectoryError as e:
+                    #inotify_simple known issue
+                    #https://github.com/chrisjbillington/inotify_simple/issues/17
+                    self.logger.critical('inotify_simple version error on this kernel')
+                    self.queue.put(PyaltEnum.INOTIFY_ERR)
+                    return
 
 
-            mask = flags.MODIFY | flags.MOVE_SELF
-            wd = inotify.add_watch(self.config.log_path, mask)
+                mask = flags.MODIFY | flags.MOVE_SELF
+                wd = inotify.add_watch(self.config.log_path, mask)
 
-            while True:
-                do_break = False
-                for event in inotify.read():
-                    for flag in flags.from_mask(event.mask):
-                        if flag is flags.MOVE_SELF:
-                            # rollover is happening
-                            self.logfile_modified(fh)
-                            do_break = True
-                        elif flag is flags.MODIFY:
-                            self.logfile_modified(fh)
+                while True:
+                    do_break = False
+                    for event in inotify.read():
+                        for flag in flags.from_mask(event.mask):
+                            if flag is flags.MOVE_SELF:
+                                # rollover is happening
+                                self.logfile_modified(fh)
+                                do_break = True
+                            elif flag is flags.MODIFY:
+                                self.logfile_modified(fh)
 
-                if do_break:
-                    break
+                    if do_break:
+                        break
+
+        except FileNotFoundError as e:
+            self.logger.warning('Log rollover did not happen quickly enough. Quick sleep then try again.')
+            time.sleep(.05)
+            self.run(rollover=True)
 
         inotify.close()
         self.run(rollover=True)
@@ -191,7 +197,7 @@ class Main(object):
             if data == PyaltEnum.SHUTDOWN:
                 break
 
-            worker = Worker(data, self.config, modules=list())
+            worker = Worker(data, self.config)
             worker.execute()
 
         logger.info('Done.')

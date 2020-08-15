@@ -61,7 +61,7 @@ class KOTH(module.MapModule):
                 # waiting for complete minutes
                 break
 
-            team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
+            team_color = 'blue' if player.team == server.game.map.left_team else 'orange'
             other_team = 'blue' if team_color is 'orange' else 'orange'
 
             if t and t%60 == 0:
@@ -71,8 +71,8 @@ class KOTH(module.MapModule):
                 server.serverMessage("... DING! ...")
                 server.serverMessage('Score one for the %ss!!!' % team_color)
 
-                left = 1 if player.team == server.map.leftTeam else 0
-                right = 1 if player.team == server.map.rightTeam else 0
+                left = 1 if player.team == server.game.map.left_team else 0
+                right = 1 if player.team == server.game.map.right_team else 0
                 
                 KOTH.leftscore += left
                 KOTH.rightscore += right
@@ -143,6 +143,10 @@ class KOTH(module.MapModule):
             player.whisper("/attach <player_name> - Spawn at your teammate's loc")
             player.whisper("/a - Shortcut to attach to your last attached teammate.")
             player.whisper("*********************************************************************")
+            player.whisper('')
+            player.whisper("I'm in the middle of a refactor, so I'm sorry if this")
+            player.whisper("doesn't work properly ATM.")
+
 
     #@ModuleEvent
     def mapChange(self, event):
@@ -167,7 +171,7 @@ class KOTH(module.MapModule):
         events.Events.powerupAutoUse(self, event)
         server = self.config.get_server(event['port'])
         
-        if server.map.name != self.map_name: return
+        if server.game.map.name != self.map_name: return
         if event['powerup'] != 'Health' or (event['positionX'], event['positionY']) != (1501, 1735): return
         #THis is the right powerup
         player = server.get_player_by_number(event['player'])
@@ -183,7 +187,7 @@ class KOTH(module.MapModule):
                 #stop the last timer
                 self.flag_timer_event.set()
 
-            team_color = 'blue' if player.team == server.map.leftTeam else 'orange'
+            team_color = 'blue' if player.team == server.game.map.left_team else 'orange'
             other_color = 'orange' if team_color == 'blue' else 'blue'
             server.serverMessage("%s grabbed the flag for the %s team!!" % (player.nickname, team_color))
             logger.info('%s took the flag for the %s team' % (player.nickname, team_color))
